@@ -38,6 +38,8 @@ class HttpClient {
       httpAgent = https.Agent
       globalAgent = https.globalAgent
       pUrl.port = pUrl.port || '443'
+    } else {
+      throw Error(`Unknown url type: ${url}`)
     }
 
     // Setup endpoint

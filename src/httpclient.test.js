@@ -1,11 +1,11 @@
 const expect = require('unexpected')
 const fs = require('fs')
+const zlib = require('zlib')
 
 const HttpClient = require('./httpclient')
 const HttpClientError = require('./httpclienterror')
 
 const { createTestHttpServer, createTestHttpsServer } = require('./testutils')
-const net = require('net')
 
 const localhostCertificate = fs.readFileSync(
   `${__dirname}/../resources/localhost.crt`
@@ -16,13 +16,23 @@ const localhostPrivateKey = fs.readFileSync(
 
 describe('HttpClient', () => {
   let [httpServer, httpListenPromise] = createTestHttpServer((req, res) => {
-    if (req.url === '/timeout') {
+    if (['PUT', 'PATCH', 'DELETE'].indexOf(req.method) >= 0) {
+      res.end(req.method)
+    } else if (['HEAD'].indexOf(req.method) >= 0) {
+      res.end()
+    } else if (req.url === '/timeout') {
       //
     } else if (req.url === '/timeout_with_data') {
       res.write('.')
     } else if (req.url === '/large_response') {
       res.statusCode = 200
       res.end('x'.repeat(1024))
+    } else if (req.url === '/chunked') {
+      res.statusCode = 200
+      res.write('x')
+      setTimeout(() => {
+        res.end('x')
+      })
     } else if (req.url === '/echo') {
       res.statusCode = 200
       req.on('data', data => {
@@ -33,6 +43,14 @@ describe('HttpClient', () => {
       })
     } else if (req.url === '/ok') {
       res.end('OK')
+    } else if (req.url === '/gzip') {
+      let gziped = zlib.gzipSync('ok')
+      res.setHeader('content-encoding', 'gzip')
+      res.end(gziped)
+    } else if (req.url === '/deflate') {
+      let deflated = zlib.deflateSync('ok')
+      res.setHeader('content-encoding', 'deflate')
+      res.end(deflated)
     } else {
       res.statusCode = 404
       res.end()
@@ -74,7 +92,7 @@ describe('HttpClient', () => {
     httpsServer.close()
   })
 
-  it('should return 200 ok")', () => {
+  it('should return 200 ok', () => {
     let httpClient = new HttpClient()
     let response = httpClient.get(`${httpBaseUrl}/ok`)
     return expect(response, 'to be fulfilled with value satisfying', {
@@ -83,8 +101,65 @@ describe('HttpClient', () => {
     })
   })
 
+  it('should return 200 ok from gzip content-encoding', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.get(`${httpBaseUrl}/gzip`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK'
+    })
+  })
+
+  it('should return 200 ok from deflate content-encoding', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.get(`${httpBaseUrl}/deflate`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK'
+    })
+  })
+
+  it('should return 200: DELETE', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.delete(`${httpBaseUrl}/`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK',
+      data: Buffer.from('DELETE', 'utf8')
+    })
+  })
+
+  it('should return 200: PUT', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.put(`${httpBaseUrl}/`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK',
+      data: Buffer.from('PUT', 'utf8')
+    })
+  })
+
+  it('should return 200: PATCH', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.patch(`${httpBaseUrl}/`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK',
+      data: Buffer.from('PATCH', 'utf8')
+    })
+  })
+
+  it('should return 200: HEAD', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.head(`${httpBaseUrl}/`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK'
+    })
+  })
+
   it('should return 200 ok 4 times with 2 in parallel', () => {
-    let httpClient = new HttpClient({ maxConcurrent: 2, timeout: 100 })
+    let httpClient = new HttpClient({ maxConcurrent: 2, keepAlive: true })
     let promises = []
     for (let i = 0; i < 4; i++) {
       promises.push(httpClient.get(`${httpBaseUrl}/ok`))
@@ -107,6 +182,42 @@ describe('HttpClient', () => {
         }
       ]
     )
+  })
+
+  it('should return 200 ok for chunked reply', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.get(`${httpBaseUrl}/chunked`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK',
+      data: Buffer.from('xx')
+    })
+  })
+
+  it('should return 200 ok for https', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.get(httpsBaseUrl, null, {
+      ca: localhostCertificate
+    })
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200
+    })
+  })
+
+  it('should return 302 from http://google.com', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.get(`http://google.com`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 302
+    })
+  })
+
+  it('should return 302 from https://google.com', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.get(`https://google.com`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 302
+    })
   })
 
   it('should return 404', () => {
@@ -161,7 +272,7 @@ describe('HttpClient', () => {
     )
   })
 
-  it('should fail', done => {
+  it('should fail with ECONNREFUSED', done => {
     let httpClient = new HttpClient()
     resetServer.close(() => {
       let response = httpClient.get(`http://localhost:${resetPort}`, null)
@@ -178,14 +289,14 @@ describe('HttpClient', () => {
         })
     })
   })
-
-  it('https connected', () => {
+  it('should fail with unknown protocol', () => {
     let httpClient = new HttpClient()
-    let response = httpClient.get(httpsBaseUrl, null, {
-      ca: localhostCertificate
-    })
-    return expect(response, 'to be fulfilled with value satisfying', {
-      statusCode: 200
-    })
+    return expect(
+      () => {
+        httpClient.get(`sftp://localhost/`, null)
+      },
+      'to throw',
+      'Unknown url type: sftp://localhost/'
+    )
   })
 })
