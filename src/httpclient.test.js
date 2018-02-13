@@ -164,6 +164,7 @@ describe('HttpClient', () => {
     for (let i = 0; i < 4; i++) {
       promises.push(httpClient.get(`${httpBaseUrl}/ok`))
     }
+
     return expect(
       Promise.all(promises),
       'to be fulfilled with value satisfying',

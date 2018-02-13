@@ -143,7 +143,7 @@ function _processQueue(endpoint) {
     initialRequestTime = process.hrtime()
     let httpRequester = request.httpRequester
     let httpOptions = request.httpOptions
-    var httpRequest = httpRequester(httpOptions, response => {
+    let httpRequest = httpRequester(httpOptions, response => {
       initialResponseTime = process.hrtime()
       responseDataStartedTime = initialResponseTime // Initial value if we get no body
 
