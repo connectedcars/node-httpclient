@@ -309,7 +309,117 @@ describe('HttpClient', () => {
     )
   })
 
-  it('should stream Hello with postStream', () => {
+  it('should return 200 for stream GET', () => {
+    let httpClient = new HttpClient()
+
+    let stream = httpClient.getStream(`${httpBaseUrl}/ok`)
+    let chunks = []
+    stream.on('data', chunk => {
+      chunks.push(chunk)
+    })
+
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(
+        Buffer.concat(chunks).toString('utf8'),
+        'to equal',
+        'OK'
+      )
+      return Promise.all([responseRes, chunksRes])
+    })
+  })
+
+  it('should return 200 for stream DELETE', () => {
+    let httpClient = new HttpClient()
+
+    let stream = httpClient.deleteStream(`${httpBaseUrl}/`)
+    let chunks = []
+    stream.on('data', chunk => {
+      chunks.push(chunk)
+    })
+
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(
+        Buffer.concat(chunks).toString('utf8'),
+        'to equal',
+        'DELETE'
+      )
+      return Promise.all([responseRes, chunksRes])
+    })
+  })
+
+  it('should return 200 for stream PUT', () => {
+    let httpClient = new HttpClient()
+
+    let testFile = tmpFile()
+    let stream = httpClient.putStream(`${httpBaseUrl}/echo`)
+    stream.pipe(fs.createWriteStream(testFile))
+    stream.write('Hello')
+    stream.end()
+
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(
+        fs.readFileSync(testFile, 'utf8'),
+        'to equal',
+        'PUT'
+      )
+      return Promise.all([responseRes, chunksRes])
+    })
+  })
+
+  it('should return 200 for stream PATCH', () => {
+    let httpClient = new HttpClient()
+
+    let testFile = tmpFile()
+    let stream = httpClient.patchStream(`${httpBaseUrl}/echo`)
+    stream.pipe(fs.createWriteStream(testFile))
+    stream.write('Hello')
+    stream.end()
+
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(
+        fs.readFileSync(testFile, 'utf8'),
+        'to equal',
+        'PATCH'
+      )
+      return Promise.all([responseRes, chunksRes])
+    })
+  })
+
+  it('should return 200 for stream request', () => {
+    let httpClient = new HttpClient()
+
+    let stream = httpClient.requestStream('GET', `${httpBaseUrl}/ok`)
+    let chunks = []
+    stream.on('data', chunk => {
+      chunks.push(chunk)
+    })
+
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(
+        Buffer.concat(chunks).toString('utf8'),
+        'to equal',
+        'OK'
+      )
+      return Promise.all([responseRes, chunksRes])
+    })
+  })
+
+  it('should post stream Hello with postStream', () => {
     let httpClient = new HttpClient()
 
     let testFile = tmpFile()

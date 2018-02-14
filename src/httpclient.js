@@ -149,9 +149,77 @@ class HttpClient {
    * @param {Object} [options]
    * @returns {HttpClientStream}
    */
+  requestStream(method, url, headers, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options)
+    let stream = this.request(method, url, headers, null, requestOptions)
+    stream.end()
+    return stream
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  getStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options)
+    let stream = this.request('GET', url, headers, null, requestOptions)
+    stream.end()
+    return stream
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  deleteStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options)
+    let stream = this.request('DELETE', url, headers, null, requestOptions)
+    stream.end()
+    return stream
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
   postStream(url, headers, options = {}) {
     let requestOptions = Object.assign({ stream: true }, options)
     return this.request('POST', url, headers, null, requestOptions)
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  putStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options)
+    let stream = this.request('PUT', url, headers, null, requestOptions)
+    return stream
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  patchStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options)
+    let stream = this.request('PATCH', url, headers, null, requestOptions)
+    return stream
   }
 }
 
