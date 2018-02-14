@@ -212,7 +212,7 @@ function _processQueue(endpoint) {
       let error = null
       if (request.stream) {
         //responseStream.pause()
-        request.stream.addReadableStream(responseStream)
+        request.stream._addReadableStream(responseStream)
         responseStream = request.stream
       } else {
         // Register data listeners
@@ -272,7 +272,7 @@ function _processQueue(endpoint) {
     }
 
     if (request.stream) {
-      request.stream.addClientRequest(httpRequest)
+      request.stream._addClientRequest(httpRequest)
     } else {
       httpRequest.end()
     }

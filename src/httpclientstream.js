@@ -21,19 +21,32 @@ class HttpClientStream extends Duplex {
     this.writes = []
     this.ended = null
     this.readable = false
+    this.destroyed = false
+    this.destroyCallback = null
+    this.destroyedError = null
+    this.clientRequestDestroyed = false
+    this.readableStreamDestroyed = false
   }
 
   /**
    *
    * @param {ClientRequest} clientRequest
    */
-  addClientRequest(clientRequest) {
+  _addClientRequest(clientRequest) {
     this.clientRequest = clientRequest
+
+    if (this.destroyed) {
+      return this._destroy(this.destroyedError, this.destroyCallback)
+    }
+
     while (this.writes.length > 0) {
       let [chunk, callback] = this.writes.splice(0, 2)
       this.clientRequest.write(chunk)
       callback()
     }
+
+    // Node does a nextTick so we should never hit this code, but lets be sure anyway
+    /* istanbul ignore if */
     if (this.ended) {
       this.clientRequest.end()
       this.ended()
@@ -44,8 +57,15 @@ class HttpClientStream extends Duplex {
    *
    * @param {Readable} readableStream
    */
-  addReadableStream(readableStream) {
+  _addReadableStream(readableStream) {
     this.readableStream = readableStream
+
+    // Node does a nextTick so we should never hit this code, but lets be sure anyway
+    /* istanbul ignore if */
+    if (this.destroyed) {
+      return this._destroy(this.destroyedError, this.destroyCallback)
+    }
+
     this.readableStream.on('readable', () => {
       if (this.reads.shift()) {
         this.push(this.readableStream.read())
@@ -91,6 +111,7 @@ class HttpClientStream extends Duplex {
    * @param {Function} callback
    */
   _final(callback) {
+    /* istanbul ignore else */
     if (this.clientRequest) {
       this.clientRequest.end()
       callback()
@@ -104,13 +125,20 @@ class HttpClientStream extends Duplex {
    * @param {Function} callback
    */
   _destroy(err, callback) {
-    if (this.clientRequest) {
+    this.destroyed = true
+    this.destroyCallback = callback
+    this.destroyedError = err
+    if (this.clientRequest && !this.clientRequestDestroyed) {
       this.clientRequest.destroy(err)
+      this.clientRequestDestroyed = true
     }
-    if (this.readableStream) {
+    if (this.readableStream && !this.readableStreamDestroyed) {
       this.readableStream.destroy(err)
+      this.readableStreamDestroyed = true
     }
-    callback()
+    if (this.clientRequestDestroyed && this.readableStreamDestroyed) {
+      this.destroyCallback()
+    }
   }
 }
 

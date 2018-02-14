@@ -318,8 +318,16 @@ describe('HttpClient', () => {
     stream.write('Hello')
     stream.end()
 
-    return stream.response.then(res => {
-      return expect(fs.readFileSync(testFile, 'utf8'), 'to equal', 'Hello')
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(
+        fs.readFileSync(testFile, 'utf8'),
+        'to equal',
+        'Hello'
+      )
+      return Promise.all([responseRes, chunksRes])
     })
   })
 
@@ -338,12 +346,16 @@ describe('HttpClient', () => {
       stream.end()
     }, 20)
 
-    return stream.response.then(res => {
-      return expect(
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(
         fs.readFileSync(testFile, 'utf8'),
         'to equal',
         'HelloHelloHello'
       )
+      return Promise.all([responseRes, chunksRes])
     })
   })
 
@@ -362,19 +374,22 @@ describe('HttpClient', () => {
       stream.end()
     }, 20)
 
-    return stream.response.then(res => {
-      return expect(
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(
         fs.readFileSync(testFile, 'utf8'),
         'to equal',
         'HelloHelloHello'
       )
+      return Promise.all([responseRes, chunksRes])
     })
   })
 
   it('should stream HelloHello with postStream and own setup', () => {
     let httpClient = new HttpClient()
 
-    let testFile = tmpFile()
     let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
     stream.write('Hello')
 
@@ -401,6 +416,38 @@ describe('HttpClient', () => {
       let chunksRes = expect(chunks.join(''), 'to equal', 'HelloHelloHello')
       let endCountRes = expect(endCount, 'to equal', 1)
       return Promise.all([responseRes, chunksRes, endCountRes])
+    })
+  })
+
+  it('should fail on stream destroy with socket hang up', () => {
+    let httpClient = new HttpClient()
+
+    let testFile = tmpFile()
+    let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
+    stream.pipe(fs.createWriteStream(testFile))
+    stream.write('Hello')
+    stream.destroy()
+
+    return expect(
+      stream.response,
+      'to be rejected with error satisfying',
+      new Error('socket hang up')
+    )
+  })
+
+  it('should succeed on stream destroy after data recieved', () => {
+    let httpClient = new HttpClient()
+
+    let testFile = tmpFile()
+    let stream = httpClient.postStream(`${httpBaseUrl}/timeout_with_data`)
+    stream.pipe(fs.createWriteStream(testFile))
+    stream.end()
+    stream.on('data', () => {
+      stream.destroy()
+    })
+
+    return expect(stream.response, 'to be fulfilled with value satisfying', {
+      statusCode: 200
     })
   })
 })
