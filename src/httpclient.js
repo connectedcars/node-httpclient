@@ -22,6 +22,9 @@ class HttpClient {
    * @param {string|Buffer} [options.clientCert]
    * @param {string|Buffer} [options.clientPfx]
    * @param {string|Buffer} [options.clientPassphrase]
+   * @param {string|Buffer} [options.rejectUnauthorized]
+   * @param {string|Buffer} [options.secureProtocol]
+   * @param {string|Buffer} [options.ciphers]
    * @param {number} [options.maxConcurrent]
    * @param {number} [options.maxTotalConcurrent]
    */
@@ -35,6 +38,9 @@ class HttpClient {
     this._clientCert = options.clientCert
     this.clientPfx = options.clientPfx
     this.clientPassphrase = options.clientPassphrase
+    this.rejectUnauthorized = options.rejectUnauthorized
+    this.secureProtocol = options.secureProtocol
+    this.ciphers = options.ciphers
     this._maxTotalConcurrent = options.maxTotalConcurrent || 100
     this._totalOutstanding = 0
     this._defaultEndpoint = {
@@ -62,6 +68,9 @@ class HttpClient {
    * @param {string|Buffer} [options.clientCert]
    * @param {string|Buffer} [options.clientPfx]
    * @param {string|Buffer} [options.clientPassphrase]
+   * @param {string|Buffer} [options.rejectUnauthorized]
+   * @param {string|Buffer} [options.secureProtocol]
+   * @param {string|Buffer} [options.ciphers]
    * @param {boolean} [options.stream]
    * @returns {any}
    */
@@ -74,12 +83,12 @@ class HttpClient {
     let globalAgent
     if (pUrl.protocol === 'http:') {
       httpRequester = http.request
-      httpAgent = options.agent || this._agent || http.Agent
+      httpAgent = http.Agent
       globalAgent = http.globalAgent
       pUrl.port = pUrl.port || '80'
     } else if (pUrl.protocol === 'https:') {
       httpRequester = https.request
-      httpAgent = options.agent || this._agent || https.Agent
+      httpAgent = https.Agent
       globalAgent = https.globalAgent
       pUrl.port = pUrl.port || '443'
     } else {
@@ -92,7 +101,9 @@ class HttpClient {
     if (!endpoint) {
       endpoint = Object.assign({}, this._defaultEndpoint)
       endpoint.name = endpointName
-      if (this._keepAlive || options.keepAlive) {
+      if (options.agent || this._agent) {
+        endpoint.agent = options.agent || this._agent
+      } else if (this._keepAlive || options.keepAlive) {
         endpoint.agent = new httpAgent({ keepAlive: true })
       } else {
         endpoint.agent = globalAgent
@@ -111,6 +122,9 @@ class HttpClient {
       ca: options.ca || this._ca,
       key: options.clientKey || this._clientKey,
       cert: options.clientCert || this._clientCert,
+      rejectUnauthorized: options.rejectUnauthorized || this.rejectUnauthorized,
+      secureProtocol: options.secureProtocol || this.secureProtocol,
+      ciphers: options.ciphers || this.ciphers,
       timeout: options.timeout || this._timeout
     }
 
