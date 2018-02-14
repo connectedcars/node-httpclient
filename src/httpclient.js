@@ -11,7 +11,7 @@ class HttpClient {
    *
    * @param {Object} [options]
    * @param {number} [options.timeout]
-   * @param {number} [options.keepAlive]
+   * @param {boolean} [options.keepAlive]
    * @param {number} [options.maxResponseSize]
    * @param {string} [options.ca]
    * @param {number} [options.maxConcurrent]
