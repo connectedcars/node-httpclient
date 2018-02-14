@@ -6,6 +6,9 @@ const zlib = require('zlib')
 const HttpClientError = require('./httpclienterror')
 const HttpClientStream = require('./httpclientstream')
 
+// Make vscode happy
+const Agent = http.Agent
+
 class HttpClient {
   /**
    *
@@ -13,7 +16,12 @@ class HttpClient {
    * @param {number} [options.timeout]
    * @param {boolean} [options.keepAlive]
    * @param {number} [options.maxResponseSize]
-   * @param {string} [options.ca]
+   * @param {Agent} [options.agent]
+   * @param {string|Buffer} [options.ca]
+   * @param {string|Buffer} [options.clientKey]
+   * @param {string|Buffer} [options.clientCert]
+   * @param {string|Buffer} [options.clientPfx]
+   * @param {string|Buffer} [options.clientPassphrase]
    * @param {number} [options.maxConcurrent]
    * @param {number} [options.maxTotalConcurrent]
    */
@@ -21,7 +29,12 @@ class HttpClient {
     this._timeout = options.timeout || 60 * 1000
     this._maxResponseSize = options.maxResponseSize || 10 * 1024 * 1024
     this._keepAlive = options.keepAlive
+    this._agent = options.agent
     this._ca = options.ca
+    this._clientKey = options.clientKey
+    this._clientCert = options.clientCert
+    this.clientPfx = options.clientPfx
+    this.clientPassphrase = options.clientPassphrase
     this._maxTotalConcurrent = options.maxTotalConcurrent || 100
     this._totalOutstanding = 0
     this._defaultEndpoint = {
@@ -39,10 +52,16 @@ class HttpClient {
    * @param {Object} [headers]
    * @param {Buffer} [data]
    * @param {Object} [options]
+   * @param {Agent}  [options.agent]
    * @param {number} [options.timeout]
    * @param {number} [options.keepAlive]
    * @param {number} [options.maxResponseSize]
-   * @param {string} [options.ca]
+   * @param {number} [options.maxResponseSize]
+   * @param {string|Buffer} [options.ca]
+   * @param {string|Buffer} [options.clientKey]
+   * @param {string|Buffer} [options.clientCert]
+   * @param {string|Buffer} [options.clientPfx]
+   * @param {string|Buffer} [options.clientPassphrase]
    * @param {boolean} [options.stream]
    * @returns {any}
    */
@@ -55,12 +74,12 @@ class HttpClient {
     let globalAgent
     if (pUrl.protocol === 'http:') {
       httpRequester = http.request
-      httpAgent = http.Agent
+      httpAgent = options.agent || this._agent || http.Agent
       globalAgent = http.globalAgent
       pUrl.port = pUrl.port || '80'
     } else if (pUrl.protocol === 'https:') {
       httpRequester = https.request
-      httpAgent = https.Agent
+      httpAgent = options.agent || this._agent || https.Agent
       globalAgent = https.globalAgent
       pUrl.port = pUrl.port || '443'
     } else {
@@ -90,6 +109,8 @@ class HttpClient {
       headers: headers,
       agent: endpoint.agent,
       ca: options.ca || this._ca,
+      key: options.clientKey || this._clientKey,
+      cert: options.clientCert || this._clientCert,
       timeout: options.timeout || this._timeout
     }
 
