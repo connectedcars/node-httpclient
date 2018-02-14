@@ -4,8 +4,19 @@ const https = require('https')
 const zlib = require('zlib')
 
 const HttpClientError = require('./httpclienterror')
+const HttpClientStream = require('./httpclientstream')
 
 class HttpClient {
+  /**
+   *
+   * @param {Object} [options]
+   * @param {number} [options.timeout]
+   * @param {number} [options.keepAlive]
+   * @param {number} [options.maxResponseSize]
+   * @param {string} [options.ca]
+   * @param {number} [options.maxConcurrent]
+   * @param {number} [options.maxTotalConcurrent]
+   */
   constructor(options = {}) {
     this._timeout = options.timeout || 60 * 1000
     this._maxResponseSize = options.maxResponseSize || 10 * 1024 * 1024
@@ -21,6 +32,20 @@ class HttpClient {
     this._endpoints = {}
   }
 
+  /**
+   *
+   * @param {string} method
+   * @param {string} url
+   * @param {Object} [headers]
+   * @param {Buffer} [data]
+   * @param {Object} [options]
+   * @param {number} [options.timeout]
+   * @param {number} [options.keepAlive]
+   * @param {number} [options.maxResponseSize]
+   * @param {string} [options.ca]
+   * @param {boolean} [options.stream]
+   * @returns {any}
+   */
   request(method, url, headers = {}, data = null, options = {}) {
     let pUrl = UrlParser.parse(url)
 
@@ -70,18 +95,27 @@ class HttpClient {
 
     // Register for queue processing after we return the promise
     process.nextTick(_processQueue, endpoint)
-    return new Promise((resolve, reject) => {
+
+    // Add to request queue
+    let stream = options.stream ? new HttpClientStream() : null
+    let responsePromise = new Promise((resolve, reject) => {
       endpoint.requests.push({
         httpRequester,
         httpOptions,
         data,
-        maxResponseSize: options.maxResponseSize || this._maxResponseSize,
         resolve,
         reject,
+        stream,
+        maxResponseSize: options.maxResponseSize || this._maxResponseSize,
         queuedTime: new Date().getTime(),
         queuedHrTime: process.hrtime()
       })
     })
+    if (stream) {
+      stream.response = responsePromise
+    }
+
+    return options.stream ? stream : responsePromise
   }
 
   get(url, headers, options) {
@@ -106,6 +140,18 @@ class HttpClient {
 
   head(url, headers, options) {
     return this.request('HEAD', url, headers, null, options)
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  postStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options)
+    return this.request('POST', url, headers, null, requestOptions)
   }
 }
 
@@ -163,21 +209,28 @@ function _processQueue(endpoint) {
         }
       }
 
-      // Register data listeners
-      let responseDataLength = 0
       let error = null
-      responseStream.on('data', chunk => {
-        if (responseData.length === 0) {
-          responseDataStartedTime = process.hrtime()
-        }
-        responseDataLength += chunk.length
-        if (responseDataLength <= request.maxResponseSize) {
-          responseData.push(chunk)
-        } else {
-          response.destroy()
-          error = 'Response too lange'
-        }
-      })
+      if (request.stream) {
+        //responseStream.pause()
+        request.stream.addReadableStream(responseStream)
+        responseStream = request.stream
+      } else {
+        // Register data listeners
+        let responseDataLength = 0
+        responseStream.on('data', chunk => {
+          if (responseData.length === 0) {
+            responseDataStartedTime = process.hrtime()
+          }
+          responseDataLength += chunk.length
+          if (responseDataLength <= request.maxResponseSize) {
+            responseData.push(chunk)
+          } else {
+            response.destroy()
+            error = 'Response too lange'
+          }
+        })
+      }
+
       responseStream.on('end', () => {
         responseReceivedTime = process.hrtime()
         endpoint.outstanding--
@@ -217,7 +270,12 @@ function _processQueue(endpoint) {
         requestSentTime = process.hrtime()
       })
     }
-    httpRequest.end()
+
+    if (request.stream) {
+      request.stream.addClientRequest(httpRequest)
+    } else {
+      httpRequest.end()
+    }
 
     // Increment outstanding as we just sent the request
     endpoint.outstanding++

@@ -4,6 +4,9 @@
 const http = require('http')
 const https = require('https')
 
+const os = require('os')
+const crypto = require('crypto')
+
 // Make ts-check happy
 const HttpServer = http.Server
 const HttpsServer = https.Server
@@ -54,7 +57,14 @@ function createTestHttpsServer(options, requestHandler) {
   ]
 }
 
+function tmpFile() {
+  let tmpdir = os.tmpdir()
+  let randomName = crypto.randomBytes(32).toString('hex')
+  return `${tmpdir}/${randomName}`
+}
+
 module.exports = {
   createTestHttpServer,
-  createTestHttpsServer
+  createTestHttpsServer,
+  tmpFile
 }

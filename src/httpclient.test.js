@@ -1,11 +1,16 @@
 const expect = require('unexpected')
 const fs = require('fs')
+
 const zlib = require('zlib')
 
 const HttpClient = require('./httpclient')
 const HttpClientError = require('./httpclienterror')
 
-const { createTestHttpServer, createTestHttpsServer } = require('./testutils')
+const {
+  createTestHttpServer,
+  createTestHttpsServer,
+  tmpFile
+} = require('./testutils')
 
 const localhostCertificate = fs.readFileSync(
   `${__dirname}/../resources/localhost.crt`
@@ -205,19 +210,21 @@ describe('HttpClient', () => {
     })
   })
 
-  it('should return 302 from http://google.com', () => {
+  it('should return 302 from http://google.com', function() {
+    this.slow(1000)
     let httpClient = new HttpClient()
     let response = httpClient.get(`http://google.com`)
     return expect(response, 'to be fulfilled with value satisfying', {
-      statusCode: 302
+      statusCode: expect.it('to be within', 301, 302)
     })
   })
 
-  it('should return 302 from https://google.com', () => {
+  it('should return 302 from https://google.com', function() {
+    this.slow(1000)
     let httpClient = new HttpClient()
     let response = httpClient.get(`https://google.com`)
     return expect(response, 'to be fulfilled with value satisfying', {
-      statusCode: 302
+      statusCode: expect.it('to be within', 301, 302)
     })
   })
 
@@ -261,7 +268,8 @@ describe('HttpClient', () => {
     )
   })
 
-  it('should timeout with a little data sent', () => {
+  it('should timeout with a little data sent', function() {
+    this.slow(1000)
     let httpClient = new HttpClient()
     let response = httpClient.get(`${httpBaseUrl}/timeout_with_data`, null, {
       timeout: 100
@@ -299,5 +307,100 @@ describe('HttpClient', () => {
       'to throw',
       'Unknown url type: sftp://localhost/'
     )
+  })
+
+  it('should stream Hello with postStream', () => {
+    let httpClient = new HttpClient()
+
+    let testFile = tmpFile()
+    let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
+    stream.pipe(fs.createWriteStream(testFile))
+    stream.write('Hello')
+    stream.end()
+
+    return stream.response.then(res => {
+      return expect(fs.readFileSync(testFile, 'utf8'), 'to equal', 'Hello')
+    })
+  })
+
+  it('should stream HelloHelloHello with postStream and delayed writes', () => {
+    let httpClient = new HttpClient()
+
+    let testFile = tmpFile()
+    let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
+    stream.pipe(fs.createWriteStream(testFile))
+    stream.write('Hello')
+    setTimeout(() => {
+      stream.write('Hello')
+    }, 10)
+    setTimeout(() => {
+      stream.write('Hello')
+      stream.end()
+    }, 20)
+
+    return stream.response.then(res => {
+      return expect(
+        fs.readFileSync(testFile, 'utf8'),
+        'to equal',
+        'HelloHelloHello'
+      )
+    })
+  })
+
+  it('should stream HelloHello with postStream and delayed pipe setup', () => {
+    let httpClient = new HttpClient()
+
+    let testFile = tmpFile()
+    let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
+    stream.write('Hello')
+    setTimeout(() => {
+      stream.pipe(fs.createWriteStream(testFile))
+      stream.write('Hello')
+    }, 10)
+    setTimeout(() => {
+      stream.write('Hello')
+      stream.end()
+    }, 20)
+
+    return stream.response.then(res => {
+      return expect(
+        fs.readFileSync(testFile, 'utf8'),
+        'to equal',
+        'HelloHelloHello'
+      )
+    })
+  })
+
+  it('should stream HelloHello with postStream and own setup', () => {
+    let httpClient = new HttpClient()
+
+    let testFile = tmpFile()
+    let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
+    stream.write('Hello')
+
+    let chunks = []
+    let endCount = 0
+    setTimeout(() => {
+      stream.on('data', chunk => {
+        chunks.push(chunk.toString('utf8'))
+      })
+      stream.on('end', () => {
+        endCount++
+      })
+      stream.write('Hello')
+    }, 10)
+    setTimeout(() => {
+      stream.write('Hello')
+      stream.end()
+    }, 20)
+
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(chunks.join(''), 'to equal', 'HelloHelloHello')
+      let endCountRes = expect(endCount, 'to equal', 1)
+      return Promise.all([responseRes, chunksRes, endCountRes])
+    })
   })
 })
