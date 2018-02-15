@@ -29,6 +29,13 @@ class HttpClientStream extends Duplex {
   }
 
   /**
+   * @returns {boolean}
+   */
+  isPendingRead() {
+    return this.reads.length > 0
+  }
+
+  /**
    *
    * @param {ClientRequest} clientRequest
    */

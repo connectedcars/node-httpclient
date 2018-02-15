@@ -419,6 +419,24 @@ describe('HttpClient', () => {
     })
   })
 
+  /* TODO: Think more about the API here, should we default to returning the
+  it('should post stream Hello with postStream and get body in response', () => {
+    let httpClient = new HttpClient()
+
+    let testFile = tmpFile()
+    let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
+    //stream.pipe(fs.createWriteStream(testFile))
+    stream.write('Hello')
+    stream.end()
+
+    return stream.response.then(response => {
+      return expect(response, 'to satisfy', {
+        statusCode: 200,
+        data: Buffer.from('Hello', 'utf8')
+      })
+    })
+  }) */
+
   it('should post stream Hello with postStream', () => {
     let httpClient = new HttpClient()
 

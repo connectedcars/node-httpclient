@@ -9,6 +9,8 @@ const HttpClientStream = require('./httpclientstream')
 // Make vscode happy
 const Agent = http.Agent
 
+// TODO: Disable content encoding option
+
 class HttpClient {
   /**
    *
@@ -16,6 +18,7 @@ class HttpClient {
    * @param {number} [options.timeout]
    * @param {boolean} [options.keepAlive]
    * @param {number} [options.maxResponseSize]
+   * @param {boolean} [options.streamResponse=true] // TODO: Move to stream API
    * @param {Agent} [options.agent]
    * @param {string|Buffer} [options.ca]
    * @param {string|Buffer} [options.clientKey]
@@ -313,6 +316,7 @@ function _processQueue(endpoint) {
       }
 
       let error = null
+      //  && request.stream.isPendingRead()
       if (request.stream) {
         //responseStream.pause()
         request.stream._addReadableStream(responseStream)
