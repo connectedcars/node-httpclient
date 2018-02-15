@@ -78,13 +78,15 @@ class HttpClient {
     this._rejectUnauthorized = options.rejectUnauthorized || true
     this._secureProtocol = options.secureProtocol
     this._ciphers = options.ciphers
-    this._maxTotalConcurrent = options.maxTotalConcurrent || 100
-    this._totalOutstanding = 0
     this._autoContentDecoding = options.autoContentDecoding || true
     this._defaultEndpoint = {
       maxConcurrent: options.maxConcurrent || 10,
       outstanding: 0,
-      requests: []
+      requests: [],
+      global: {
+        outstanding: 0,
+        maxConcurrent: options.maxTotalConcurrent || 100
+      }
     }
     this._endpoints = {}
   }
@@ -368,8 +370,13 @@ class HttpClient {
 }
 
 function _processQueue(endpoint) {
-  //console.log(`_processQueue: ${endpoint.outstanding}`)
   while (endpoint.requests.length > 0) {
+    /* console.log(
+      `_processQueue: ${endpoint.outstanding} : ${endpoint.global.outstanding}`
+    )*/
+    if (endpoint.global.outstanding >= endpoint.global.maxConcurrent) {
+      break
+    }
     let request = endpoint.requests[0]
     if (endpoint.outstanding >= endpoint.maxConcurrent) {
       break
@@ -443,6 +450,7 @@ function _processQueue(endpoint) {
       responseStream.on('end', () => {
         responseReceivedTime = process.hrtime()
         endpoint.outstanding--
+        endpoint.global.outstanding--
         if (!error) {
           request.resolve({
             timings: calculateTimings(),
@@ -459,6 +467,7 @@ function _processQueue(endpoint) {
     })
     httpRequest.on('timeout', () => {
       endpoint.outstanding--
+      endpoint.global.outstanding--
       initialResponseTime = process.hrtime()
       responseDataStartedTime = initialResponseTime
       responseReceivedTime = responseDataStartedTime
@@ -467,6 +476,7 @@ function _processQueue(endpoint) {
     })
     httpRequest.on('error', e => {
       endpoint.outstanding--
+      endpoint.global.outstanding--
       request.reject(e)
       process.nextTick(_processQueue, endpoint) // Register for queue processing
     })
@@ -488,6 +498,7 @@ function _processQueue(endpoint) {
 
     // Increment outstanding as we just sent the request
     endpoint.outstanding++
+    endpoint.global.outstanding++
 
     // Dequeue the request as it has been sent
     endpoint.requests.shift()

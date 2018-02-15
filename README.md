@@ -6,9 +6,9 @@ Thin wrapper around node's http/https client that provides promises based api.
 
 ## Features
 
-* [Queuing](#Queuing)
-* [Streaming](#smart-queuing)
-* Automatic content decoding(gzip and deflate)
+* [Queuing](#queuing)
+* [Streaming](#streaming)
+* [Automatic content decoding](#automatic-content-decoding)
 * Custom CA and SSL/TLS validation
 * Client side certificates
 * Precise timing
@@ -29,11 +29,15 @@ httpClient.get('http://localhost:3000/')
 
 ## Queuing
 
+Queuing is done on each endpoint(protocol, host and port combination,
+fx. https://localhost:3000/). Limits are applied globally and per endpoint.
+
 ``` javascript
-let httpClient = new HttpClient({ maxConcurrent: 2, keepAlive: true })
+let httpClient = new HttpClient({ maxTotalConcurrent: 4, maxConcurrent: 2, keepAlive: true })
 let promises = []
 for (let i = 0; i < 4; i++) {
-    promises.push(httpClient.get(`http://localhost/ok`), null)
+    promises.push(httpClient.get(`http://host1/ok`), null)
+    promises.push(httpClient.get(`http://host2/ok`), null)
 }
 let results = await Promise.all(promises),
 ```
@@ -64,4 +68,14 @@ let stream = httpClient.postStream(`http://localhost/echo`, null, { writeStream:
 fs.createReadStream('/tmp/largefile').pipe(stream)
 let response = await stream.response
 let data = response.data
+```
+
+## Automatic content decoding
+
+Gzip and deflate are supported.
+
+``` javascript
+let response = await httpClient.get('http://localhost:3000/', {
+   "Accept-Encoding": 'gzip, deflate'
+})
 ```

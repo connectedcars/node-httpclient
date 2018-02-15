@@ -225,6 +225,52 @@ describe('HttpClient', () => {
     )
   })
 
+  it('should return 200 ok 8 times with 2 in parallel on http and https', () => {
+    let httpClient = new HttpClient({
+      maxConcurrent: 2,
+      maxTotalConcurrent: 4,
+      keepAlive: true
+    })
+    let promises = []
+    for (let i = 0; i < 4; i++) {
+      promises.push(httpClient.get(`${httpBaseUrl}/ok`))
+      promises.push(
+        httpClient.get(`${httpsBaseUrl}/ok`, null, { ca: localhostCertificate })
+      )
+    }
+
+    return expect(
+      Promise.all(promises),
+      'to be fulfilled with value satisfying',
+      [
+        {
+          statusMessage: 'OK'
+        },
+        {
+          statusMessage: 'OK'
+        },
+        {
+          statusMessage: 'OK'
+        },
+        {
+          statusMessage: 'OK'
+        },
+        {
+          statusMessage: 'OK'
+        },
+        {
+          statusMessage: 'OK'
+        },
+        {
+          statusMessage: 'OK'
+        },
+        {
+          statusMessage: 'OK'
+        }
+      ]
+    )
+  })
+
   it('should return 200 ok for chunked reply', () => {
     let httpClient = new HttpClient()
     let response = httpClient.get(`${httpBaseUrl}/chunked`)
