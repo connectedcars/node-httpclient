@@ -472,6 +472,7 @@ describe('HttpClient', () => {
     stream.write('Hello')
     stream.end()
 
+    // TODO: Move all test to this or do in-mem stream instead
     let testStreamPromise = new Promise((resolve, reject) => {
       testStream.on('finish', () => {
         resolve()
