@@ -29,14 +29,7 @@ class HttpClientStream extends Duplex {
   }
 
   /**
-   * @returns {boolean}
-   */
-  isPendingRead() {
-    return this.reads.length > 0
-  }
-
-  /**
-   *
+   * Internal function
    * @param {ClientRequest} clientRequest
    */
   _addClientRequest(clientRequest) {
@@ -61,7 +54,7 @@ class HttpClientStream extends Duplex {
   }
 
   /**
-   *
+   * Internal function
    * @param {Readable} readableStream
    */
   _addReadableStream(readableStream) {
@@ -87,7 +80,7 @@ class HttpClientStream extends Duplex {
   }
 
   /**
-   *
+   * Internal function
    * @param {number} size
    */
   _read(size) {
@@ -100,7 +93,7 @@ class HttpClientStream extends Duplex {
   }
 
   /**
-   *
+   * Internal function
    * @param {Buffer} chunk
    * @param {string} encoding
    * @param {Function} callback
@@ -114,7 +107,7 @@ class HttpClientStream extends Duplex {
   }
 
   /**
-   *
+   * Internal function
    * @param {Function} callback
    */
   _final(callback) {
@@ -127,7 +120,7 @@ class HttpClientStream extends Duplex {
   }
 
   /**
-   *
+   * Internal function
    * @param {Error} err
    * @param {Function} callback
    */

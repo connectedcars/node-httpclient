@@ -43,11 +43,11 @@ stream.pipe(fs.createWriteStream('/tmp/uploadresponsebody'))
 let response = await stream.response
 ```
 
-Upload large file from read stream and get body in response:
+Upload large file from read stream and get body in response promise:
 
 ``` javascript
 let stream = httpClient.postStream(`http://localhost/echo`, null, { writeStream: true })
 fs.createReadStream('/tmp/largefile').pipe(stream)
 let response = await stream.response
-let data = response.getJSON()
+let data = response.data
 ```

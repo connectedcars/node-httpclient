@@ -1,7 +1,8 @@
 const expect = require('unexpected')
-const fs = require('fs')
 
+const fs = require('fs')
 const zlib = require('zlib')
+const http = require('http')
 
 const HttpClient = require('./httpclient')
 const HttpClientError = require('./httpclienterror')
@@ -106,6 +107,26 @@ describe('HttpClient', () => {
     })
   })
 
+  it('should return 200 ok', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.request('GET', `${httpBaseUrl}/ok`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK'
+    })
+  })
+
+  it('should return 200 ok with agent', () => {
+    let httpClient = new HttpClient({
+      agent: new http.Agent({ keepAlive: true })
+    })
+    let response = httpClient.get(`${httpBaseUrl}/ok`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK'
+    })
+  })
+
   it('should return 200 ok from gzip content-encoding', () => {
     let httpClient = new HttpClient()
     let response = httpClient.get(`${httpBaseUrl}/gzip`)
@@ -136,7 +157,7 @@ describe('HttpClient', () => {
 
   it('should return 200: PUT', () => {
     let httpClient = new HttpClient()
-    let response = httpClient.put(`${httpBaseUrl}/`)
+    let response = httpClient.put(`${httpBaseUrl}/`, null, 'Hello')
     return expect(response, 'to be fulfilled with value satisfying', {
       statusCode: 200,
       statusMessage: 'OK',
@@ -146,7 +167,7 @@ describe('HttpClient', () => {
 
   it('should return 200: PATCH', () => {
     let httpClient = new HttpClient()
-    let response = httpClient.patch(`${httpBaseUrl}/`)
+    let response = httpClient.patch(`${httpBaseUrl}/`, null, 'Hello')
     return expect(response, 'to be fulfilled with value satisfying', {
       statusCode: 200,
       statusMessage: 'OK',
@@ -331,6 +352,33 @@ describe('HttpClient', () => {
     })
   })
 
+  it('should return 200 for stream GET without error', () => {
+    let httpClient = new HttpClient()
+    let stream = httpClient.requestStream(
+      'GET',
+      `${httpBaseUrl}/ok`,
+      null,
+      null
+    )
+    let chunks = []
+    stream.on('data', chunk => {
+      chunks.push(chunk)
+    })
+    stream.end()
+
+    return stream.response.then(response => {
+      let responseRes = expect(response, 'to satisfy', {
+        statusCode: 200
+      })
+      let chunksRes = expect(
+        Buffer.concat(chunks).toString('utf8'),
+        'to equal',
+        'OK'
+      )
+      return Promise.all([responseRes, chunksRes])
+    })
+  })
+
   it('should return 200 for stream DELETE', () => {
     let httpClient = new HttpClient()
 
@@ -401,6 +449,7 @@ describe('HttpClient', () => {
     let httpClient = new HttpClient()
 
     let stream = httpClient.requestStream('GET', `${httpBaseUrl}/ok`)
+    stream.end()
     let chunks = []
     stream.on('data', chunk => {
       chunks.push(chunk)
@@ -419,15 +468,13 @@ describe('HttpClient', () => {
     })
   })
 
-  /* TODO: Think more about the API here, should we default to returning the
   it('should post stream Hello with postStream and get body in response', () => {
     let httpClient = new HttpClient()
 
-    let testFile = tmpFile()
-    let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
-    //stream.pipe(fs.createWriteStream(testFile))
-    stream.write('Hello')
-    stream.end()
+    let stream = httpClient.postStream(`${httpBaseUrl}/echo`, null, {
+      writeStream: true
+    })
+    stream.end('Hello')
 
     return stream.response.then(response => {
       return expect(response, 'to satisfy', {
@@ -435,7 +482,7 @@ describe('HttpClient', () => {
         data: Buffer.from('Hello', 'utf8')
       })
     })
-  }) */
+  })
 
   it('should post stream Hello with postStream', () => {
     let httpClient = new HttpClient()

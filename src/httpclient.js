@@ -11,25 +11,59 @@ const Agent = http.Agent
 
 // TODO: Disable content encoding option
 
+/**
+ * @typedef RequestOptions
+ * @property {Agent}  [agent=null] Custom HTTP agent
+ * @property {number} [timeout=60000] Timeout in ms
+ * @property {number} [maxResponseSize=10485760] Max response size
+ * @property {boolean} [keepAlive=false] Enable HTTP Keep alive
+ * @property {string|Buffer} [ca=null] Trusted root certificate in pem format
+ * @property {string|Buffer} [clientKey=null] Client private key in pem format
+ * @property {string|Buffer} [clientCert=null] Client certificate in pem format
+ * @property {string|Buffer} [clientPfx=null] Client certificate and private key in pfx format
+ * @property {string} [clientPassphrase=null] Client private key passphrase
+ * @property {boolean} [rejectUnauthorized=true] Reject on TLS/SSL validation error
+ * @property {string} [secureProtocol=null] Allowed TLS/SSL protocols
+ * @property {string} [ciphers=null] Allowed TLS/SSL ciphers
+ * @property {boolean} [stream=false] Enable both write and read stream
+ * @property {boolean} [writeStream=false] Enable write stream only
+ * @property {boolean} [readStream=false] Enable read stream only
+ */
+
+/**
+ * @typedef HttpResponse
+ * @property {number} [statusCode] Status code
+ * @property {string} [statusMessage] Status message
+ * @property {Object} [headers] Headers
+ * @property {Buffer} [data] Response data
+ * @property {Object} [timings] Timing information
+ * @property {number} [timings.queued] Queued timestamp in ms
+ * @property {number} [timings.initialRequest]
+ * @property {number} [timings.requestDataStarted]
+ * @property {number} [timings.requestSent]
+ * @property {number} [timings.initialResponse]
+ * @property {number} [timings.responseDataStarted]
+ * @property {number} [timings.responseReceived]
+ */
+
 class HttpClient {
   /**
    *
    * @param {Object} [options]
-   * @param {number} [options.timeout]
-   * @param {boolean} [options.keepAlive]
-   * @param {number} [options.maxResponseSize]
-   * @param {boolean} [options.streamResponse=true] // TODO: Move to stream API
-   * @param {Agent} [options.agent]
-   * @param {string|Buffer} [options.ca]
-   * @param {string|Buffer} [options.clientKey]
-   * @param {string|Buffer} [options.clientCert]
-   * @param {string|Buffer} [options.clientPfx]
-   * @param {string|Buffer} [options.clientPassphrase]
-   * @param {string|Buffer} [options.rejectUnauthorized]
-   * @param {string|Buffer} [options.secureProtocol]
-   * @param {string|Buffer} [options.ciphers]
-   * @param {number} [options.maxConcurrent]
-   * @param {number} [options.maxTotalConcurrent]
+   * @param {Agent}  [options.agent=null] Custom HTTP agent
+   * @param {number} [options.timeout=60000] Timeout in ms
+   * @param {number} [options.maxResponseSize=10485760] Max response size
+   * @param {boolean} [options.keepAlive=false] Enable HTTP Keep alive
+   * @param {string|Buffer} [options.ca=null] Trusted root certificate
+   * @param {string|Buffer} [options.clientKey=null] Client private key in pem format
+   * @param {string|Buffer} [options.clientCert=null] Client certificate in pem format
+   * @param {string|Buffer} [options.clientPfx=null] Client certificate and private key in pfx format
+   * @param {string|Buffer} [options.clientPassphrase=null] Client private key passphrase
+   * @param {string|Buffer} [options.rejectUnauthorized=true] Reject on TLS/SSL validation error
+   * @param {string|Buffer} [options.secureProtocol=null] Allowed TLS/SSL protocols
+   * @param {string|Buffer} [options.ciphers=null] Allowed TLS/SSL ciphers
+   * @param {number} [options.maxConcurrent=10] Max concurrent connections towards and endpoint(protocol, host and port combination)
+   * @param {number} [options.maxTotalConcurrent=100] Max total connections for this HttpClient
    */
   constructor(options = {}) {
     this._timeout = options.timeout || 60 * 1000
@@ -39,11 +73,11 @@ class HttpClient {
     this._ca = options.ca
     this._clientKey = options.clientKey
     this._clientCert = options.clientCert
-    this.clientPfx = options.clientPfx
-    this.clientPassphrase = options.clientPassphrase
-    this.rejectUnauthorized = options.rejectUnauthorized
-    this.secureProtocol = options.secureProtocol
-    this.ciphers = options.ciphers
+    this._clientPfx = options.clientPfx
+    this._clientPassphrase = options.clientPassphrase
+    this._rejectUnauthorized = options.rejectUnauthorized || true
+    this._secureProtocol = options.secureProtocol
+    this._ciphers = options.ciphers
     this._maxTotalConcurrent = options.maxTotalConcurrent || 100
     this._totalOutstanding = 0
     this._defaultEndpoint = {
@@ -56,28 +90,185 @@ class HttpClient {
 
   /**
    *
-   * @param {string} method
-   * @param {string} url
-   * @param {Object} [headers]
-   * @param {Buffer} [data]
-   * @param {Object} [options]
-   * @param {Agent}  [options.agent]
-   * @param {number} [options.timeout]
-   * @param {number} [options.keepAlive]
-   * @param {number} [options.maxResponseSize]
-   * @param {number} [options.maxResponseSize]
-   * @param {string|Buffer} [options.ca]
-   * @param {string|Buffer} [options.clientKey]
-   * @param {string|Buffer} [options.clientCert]
-   * @param {string|Buffer} [options.clientPfx]
-   * @param {string|Buffer} [options.clientPassphrase]
-   * @param {string|Buffer} [options.rejectUnauthorized]
-   * @param {string|Buffer} [options.secureProtocol]
-   * @param {string|Buffer} [options.ciphers]
-   * @param {boolean} [options.stream]
-   * @returns {any}
+   * @param {string} method Request method(GET, POST, PUT, PATCH, DELETE, HEAD)
+   * @param {string} url Request url
+   * @param {Object} [headers] Request headers
+   * @param {Buffer|string} [data] Request body
+   * @param {RequestOptions} [options] Request options
+   * @returns {Promise<HttpResponse>}
    */
-  request(method, url, headers = {}, data = null, options = {}) {
+  request(method, url, headers, data, options) {
+    return /** @type {Promise<HttpResponse>} */ (this._request(
+      method,
+      url,
+      headers || {},
+      data,
+      options || {}
+    ))
+  }
+
+  /**
+   *
+   * @param {string} url Request url
+   * @param {Object} [headers] Request headers
+   * @param {RequestOptions} [options] Request options
+   * @returns {Promise<HttpResponse>}
+   */
+  get(url, headers = {}, options = {}) {
+    return this.request('GET', url, headers, null, options)
+  }
+
+  /**
+   *
+   * @param {string} url Request url
+   * @param {Object} [headers] Request headers
+   * @param {Buffer|string} [data] Request body
+   * @param {RequestOptions} [options] Request options
+   * @returns {Promise<HttpResponse>}
+   */
+  post(url, headers, data, options = {}) {
+    return this.request('POST', url, headers, data, options)
+  }
+
+  /**
+   *
+   * @param {string} url Request url
+   * @param {Object} [headers] Request headers
+   * @param {Buffer|string} [data] Request body
+   * @param {RequestOptions} [options] Request options
+   * @returns {Promise<HttpResponse>}
+   */
+  patch(url, headers, data, options = {}) {
+    return this.request('PATCH', url, headers, data, options)
+  }
+
+  /**
+   *
+   * @param {string} url Request url
+   * @param {Object} [headers] Request headers
+   * @param {Buffer|string} [data] Request body
+   * @param {RequestOptions} [options] Request options
+   * @returns {Promise<HttpResponse>}
+   */
+  put(url, headers, data, options = {}) {
+    return this.request('PUT', url, headers, data, options)
+  }
+
+  /**
+   *
+   * @param {string} url Request url
+   * @param {Object} [headers] Request headers
+   * @param {RequestOptions} [options] Request options
+   * @returns {Promise<HttpResponse>}
+   */
+  delete(url, headers = {}, options = {}) {
+    return this.request('DELETE', url, headers, null, options)
+  }
+
+  /**
+   *
+   * @param {string} url Request url
+   * @param {Object} [headers] Request headers
+   * @param {RequestOptions} [options] Request options
+   * @returns {Promise<HttpResponse>}
+   */
+  head(url, headers = {}, options = {}) {
+    return this.request('HEAD', url, headers, null, options)
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  requestStream(method, url, headers = {}, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options || {})
+    let stream = /** @type {HttpClientStream} */ (this._request(
+      method,
+      url,
+      headers || {},
+      null,
+      requestOptions
+    ))
+    return stream
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  getStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ readStream: true }, options)
+    let stream = this.requestStream('GET', url, headers, requestOptions)
+    return stream
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  deleteStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ readStream: true }, options)
+    let stream = this.requestStream('DELETE', url, headers, requestOptions)
+    return stream
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  postStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options)
+    return this.requestStream('POST', url, headers, requestOptions)
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  putStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options)
+    let stream = this.requestStream('PUT', url, headers, requestOptions)
+    return stream
+  }
+
+  /**
+   *
+   * @param {string} [url]
+   * @param {Object} [headers]
+   * @param {Object} [options]
+   * @returns {HttpClientStream}
+   */
+  patchStream(url, headers, options = {}) {
+    let requestOptions = Object.assign({ stream: true }, options)
+    let stream = this.requestStream('PATCH', url, headers, requestOptions)
+    return stream
+  }
+
+  /**
+   * Internal function
+   * @param {string} method Request method(GET, POST, PUT, PATCH, DELETE, HEAD)
+   * @param {string} url Request url
+   * @param {Object} [headers] Request headers
+   * @param {Buffer|string} [data] Request body
+   * @param {RequestOptions} [options] Request options
+   * @returns {Promise<HttpResponse>|HttpClientStream}
+   */
+  _request(method, url, headers, data, options) {
     let pUrl = UrlParser.parse(url)
 
     // Build request and options
@@ -125,17 +316,27 @@ class HttpClient {
       ca: options.ca || this._ca,
       key: options.clientKey || this._clientKey,
       cert: options.clientCert || this._clientCert,
-      rejectUnauthorized: options.rejectUnauthorized || this.rejectUnauthorized,
-      secureProtocol: options.secureProtocol || this.secureProtocol,
-      ciphers: options.ciphers || this.ciphers,
+      rejectUnauthorized:
+        options.rejectUnauthorized || this._rejectUnauthorized,
+      secureProtocol: options.secureProtocol || this._secureProtocol,
+      ciphers: options.ciphers || this._ciphers,
       timeout: options.timeout || this._timeout
     }
 
     // Register for queue processing after we return the promise
     process.nextTick(_processQueue, endpoint)
 
+    // Create stream
+    let stream = null
+    if (options.stream && !options.writeStream && !options.readStream) {
+      options.writeStream = true
+      options.readStream = true
+    }
+    if (options.writeStream || options.readStream) {
+      stream = new HttpClientStream()
+    }
+
     // Add to request queue
-    let stream = options.stream ? new HttpClientStream() : null
     let responsePromise = new Promise((resolve, reject) => {
       endpoint.requests.push({
         httpRequester,
@@ -144,120 +345,20 @@ class HttpClient {
         resolve,
         reject,
         stream,
+        writeStream: options.writeStream,
+        readStream: options.readStream,
         maxResponseSize: options.maxResponseSize || this._maxResponseSize,
         queuedTime: new Date().getTime(),
         queuedHrTime: process.hrtime()
       })
     })
+
     if (stream) {
       stream.response = responsePromise
+      return stream
     }
 
-    return options.stream ? stream : responsePromise
-  }
-
-  get(url, headers, options) {
-    return this.request('GET', url, headers, null, options)
-  }
-
-  post(url, headers, data, options) {
-    return this.request('POST', url, headers, data, options)
-  }
-
-  patch(url, headers, data, options) {
-    return this.request('PATCH', url, headers, data, options)
-  }
-
-  put(url, headers, data, options) {
-    return this.request('PUT', url, headers, data, options)
-  }
-
-  delete(url, headers, options) {
-    return this.request('DELETE', url, headers, null, options)
-  }
-
-  head(url, headers, options) {
-    return this.request('HEAD', url, headers, null, options)
-  }
-
-  /**
-   *
-   * @param {string} [url]
-   * @param {Object} [headers]
-   * @param {Object} [options]
-   * @returns {HttpClientStream}
-   */
-  requestStream(method, url, headers, options = {}) {
-    let requestOptions = Object.assign({ stream: true }, options)
-    let stream = this.request(method, url, headers, null, requestOptions)
-    stream.end()
-    return stream
-  }
-
-  /**
-   *
-   * @param {string} [url]
-   * @param {Object} [headers]
-   * @param {Object} [options]
-   * @returns {HttpClientStream}
-   */
-  getStream(url, headers, options = {}) {
-    let requestOptions = Object.assign({ stream: true }, options)
-    let stream = this.request('GET', url, headers, null, requestOptions)
-    stream.end()
-    return stream
-  }
-
-  /**
-   *
-   * @param {string} [url]
-   * @param {Object} [headers]
-   * @param {Object} [options]
-   * @returns {HttpClientStream}
-   */
-  deleteStream(url, headers, options = {}) {
-    let requestOptions = Object.assign({ stream: true }, options)
-    let stream = this.request('DELETE', url, headers, null, requestOptions)
-    stream.end()
-    return stream
-  }
-
-  /**
-   *
-   * @param {string} [url]
-   * @param {Object} [headers]
-   * @param {Object} [options]
-   * @returns {HttpClientStream}
-   */
-  postStream(url, headers, options = {}) {
-    let requestOptions = Object.assign({ stream: true }, options)
-    return this.request('POST', url, headers, null, requestOptions)
-  }
-
-  /**
-   *
-   * @param {string} [url]
-   * @param {Object} [headers]
-   * @param {Object} [options]
-   * @returns {HttpClientStream}
-   */
-  putStream(url, headers, options = {}) {
-    let requestOptions = Object.assign({ stream: true }, options)
-    let stream = this.request('PUT', url, headers, null, requestOptions)
-    return stream
-  }
-
-  /**
-   *
-   * @param {string} [url]
-   * @param {Object} [headers]
-   * @param {Object} [options]
-   * @returns {HttpClientStream}
-   */
-  patchStream(url, headers, options = {}) {
-    let requestOptions = Object.assign({ stream: true }, options)
-    let stream = this.request('PATCH', url, headers, null, requestOptions)
-    return stream
+    return responsePromise
   }
 }
 
@@ -316,9 +417,7 @@ function _processQueue(endpoint) {
       }
 
       let error = null
-      //  && request.stream.isPendingRead()
-      if (request.stream) {
-        //responseStream.pause()
+      if (request.readStream) {
         request.stream._addReadableStream(responseStream)
         responseStream = request.stream
       } else {
@@ -337,7 +436,6 @@ function _processQueue(endpoint) {
           }
         })
       }
-
       responseStream.on('end', () => {
         responseReceivedTime = process.hrtime()
         endpoint.outstanding--
@@ -378,7 +476,7 @@ function _processQueue(endpoint) {
       })
     }
 
-    if (request.stream) {
+    if (request.writeStream) {
       request.stream._addClientRequest(httpRequest)
     } else {
       httpRequest.end()
