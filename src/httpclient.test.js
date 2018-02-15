@@ -132,7 +132,20 @@ describe('HttpClient', () => {
     let response = httpClient.get(`${httpBaseUrl}/gzip`)
     return expect(response, 'to be fulfilled with value satisfying', {
       statusCode: 200,
-      statusMessage: 'OK'
+      statusMessage: 'OK',
+      data: Buffer.from('ok')
+    })
+  })
+
+  it('should return 200 gzip ok because autoContentDecoding is disabled ', () => {
+    let httpClient = new HttpClient()
+    let response = httpClient.get(`${httpBaseUrl}/gzip`, null, {
+      autoContentDecoding: false
+    })
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK',
+      data: zlib.gzipSync('ok')
     })
   })
 
@@ -141,7 +154,8 @@ describe('HttpClient', () => {
     let response = httpClient.get(`${httpBaseUrl}/deflate`)
     return expect(response, 'to be fulfilled with value satisfying', {
       statusCode: 200,
-      statusMessage: 'OK'
+      statusMessage: 'OK',
+      data: Buffer.from('ok')
     })
   })
 

@@ -13,6 +13,20 @@ Thin wrapper around node's http/https client that provides promises based api.
 * Client side certificates
 * Precise timing
 
+## Basic usage
+
+Installation:
+
+``` bash
+npm install @connectedcars/httpclient
+```
+
+``` javascript
+const { HttpClient } = require('@connectedcars/httpclient')
+let httpClient = new HttpClient()
+httpClient.get('http://localhost:3000/')
+```
+
 ## Queuing
 
 ``` javascript

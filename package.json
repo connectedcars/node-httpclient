@@ -26,16 +26,16 @@
   "devDependencies": {
     "@types/mocha": "^2.2.46",
     "@types/node": "^8.5.8",
-    "prettier": "^1.10.2",
     "babel-eslint": "^7.2.3",
+    "coveralls": "^2.13.3",
     "eslint": "^4.15.0",
     "eslint-config-prettier": "^2.9.0",
     "eslint-plugin-node": "^6.0.0",
     "eslint-plugin-prettier": "^2.4.0",
     "mocha": "^3.5.3",
-    "unexpected": "^10.36.2",
     "nyc": "^11.4.1",
-    "coveralls": "^2.13.3"
+    "prettier": "^1.10.2",
+    "unexpected": "^10.36.2"
   },
   "dependencies": {}
 }

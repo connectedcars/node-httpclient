@@ -9,8 +9,6 @@ const HttpClientStream = require('./httpclientstream')
 // Make vscode happy
 const Agent = http.Agent
 
-// TODO: Disable content encoding option
-
 /**
  * @typedef RequestOptions
  * @property {Agent}  [agent=null] Custom HTTP agent
@@ -25,6 +23,7 @@ const Agent = http.Agent
  * @property {boolean} [rejectUnauthorized=true] Reject on TLS/SSL validation error
  * @property {string} [secureProtocol=null] Allowed TLS/SSL protocols
  * @property {string} [ciphers=null] Allowed TLS/SSL ciphers
+ * @property {boolean} [autoContentDecoding=true] Automatic content decoding
  * @property {boolean} [stream=false] Enable both write and read stream
  * @property {boolean} [writeStream=false] Enable write stream only
  * @property {boolean} [readStream=false] Enable read stream only
@@ -64,6 +63,7 @@ class HttpClient {
    * @param {string|Buffer} [options.ciphers=null] Allowed TLS/SSL ciphers
    * @param {number} [options.maxConcurrent=10] Max concurrent connections towards and endpoint(protocol, host and port combination)
    * @param {number} [options.maxTotalConcurrent=100] Max total connections for this HttpClient
+   * @param {boolean} [options.autoContentDecoding=true] Automatic content decoding
    */
   constructor(options = {}) {
     this._timeout = options.timeout || 60 * 1000
@@ -80,6 +80,7 @@ class HttpClient {
     this._ciphers = options.ciphers
     this._maxTotalConcurrent = options.maxTotalConcurrent || 100
     this._totalOutstanding = 0
+    this._autoContentDecoding = options.autoContentDecoding || true
     this._defaultEndpoint = {
       maxConcurrent: options.maxConcurrent || 10,
       outstanding: 0,
@@ -347,6 +348,10 @@ class HttpClient {
         stream,
         writeStream: options.writeStream,
         readStream: options.readStream,
+        autoContentDecoding:
+          typeof options.autoContentDecoding === 'boolean'
+            ? options.autoContentDecoding
+            : this._autoContentDecoding,
         maxResponseSize: options.maxResponseSize || this._maxResponseSize,
         queuedTime: new Date().getTime(),
         queuedHrTime: process.hrtime()
@@ -400,19 +405,18 @@ function _processQueue(endpoint) {
       initialResponseTime = process.hrtime()
       responseDataStartedTime = initialResponseTime // Initial value if we get no body
 
+      let responseStream = response
       // Setup content decoding
-      let responseStream
-      switch (response.headers['content-encoding']) {
-        case 'gzip': {
-          responseStream = response.pipe(zlib.createGunzip())
-          break
-        }
-        case 'deflate': {
-          responseStream = response.pipe(zlib.createInflate())
-          break
-        }
-        default: {
-          responseStream = response
+      if (request.autoContentDecoding) {
+        switch (response.headers['content-encoding']) {
+          case 'gzip': {
+            responseStream = response.pipe(zlib.createGunzip())
+            break
+          }
+          case 'deflate': {
+            responseStream = response.pipe(zlib.createInflate())
+            break
+          }
         }
       }
 
