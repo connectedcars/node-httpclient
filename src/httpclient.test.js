@@ -465,12 +465,20 @@ describe('HttpClient', () => {
     let httpClient = new HttpClient()
 
     let testFile = tmpFile()
+    let testStream = fs.createWriteStream(testFile)
+
     let stream = httpClient.putStream(`${httpBaseUrl}/echo`)
-    stream.pipe(fs.createWriteStream(testFile))
+    stream.pipe(testStream)
     stream.write('Hello')
     stream.end()
 
-    return stream.response.then(response => {
+    let testStreamPromise = new Promise((resolve, reject) => {
+      testStream.on('finish', () => {
+        resolve()
+      })
+    })
+
+    return testStreamPromise.then(() => stream.response).then(response => {
       let responseRes = expect(response, 'to satisfy', {
         statusCode: 200
       })

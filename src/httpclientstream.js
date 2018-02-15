@@ -113,8 +113,7 @@ class HttpClientStream extends Duplex {
   _final(callback) {
     /* istanbul ignore else */
     if (this.clientRequest) {
-      this.clientRequest.end()
-      callback()
+      this.clientRequest.end(callback)
     }
     this.ended = callback
   }
