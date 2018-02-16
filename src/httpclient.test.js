@@ -467,7 +467,7 @@ describe('HttpClient', () => {
 
     let testFile = tmpFile()
     let testStream = fs.createWriteStream(testFile)
-    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
+    let testStreamPromise = AsyncUtils.streamOnAsync(testStream, 'finish')
 
     let stream = httpClient.putStream(`${httpBaseUrl}/echo`)
     stream.pipe(testStream)
@@ -492,7 +492,7 @@ describe('HttpClient', () => {
 
     let testFile = tmpFile()
     let testStream = fs.createWriteStream(testFile)
-    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
+    let testStreamPromise = AsyncUtils.streamOnAsync(testStream, 'finish')
 
     let stream = httpClient.patchStream(`${httpBaseUrl}/echo`)
     stream.pipe(testStream)
@@ -556,7 +556,7 @@ describe('HttpClient', () => {
 
     let testFile = tmpFile()
     let testStream = fs.createWriteStream(testFile)
-    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
+    let testStreamPromise = AsyncUtils.streamOnAsync(testStream, 'finish')
 
     let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
     stream.pipe(testStream)
@@ -581,7 +581,7 @@ describe('HttpClient', () => {
 
     let testFile = tmpFile()
     let testStream = fs.createWriteStream(testFile)
-    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
+    let testStreamPromise = AsyncUtils.streamOnAsync(testStream, 'finish')
 
     let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
     stream.pipe(testStream)
@@ -612,7 +612,7 @@ describe('HttpClient', () => {
 
     let testFile = tmpFile()
     let testStream = fs.createWriteStream(testFile)
-    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
+    let testStreamPromise = AsyncUtils.streamOnAsync(testStream, 'finish')
 
     let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
     stream.write('Hello')

@@ -1,5 +1,4 @@
-/* istanbul ignore next */
-function promiseOn(stream, eventName) {
+function streamOnAsync(stream, eventName) {
   return new Promise((resolve, reject) => {
     stream.on(eventName, (...args) => {
       resolve(...args)
@@ -10,6 +9,36 @@ function promiseOn(stream, eventName) {
   })
 }
 
+function delayAsync(timeout) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve()
+    }, timeout)
+  })
+}
+
+function orderedAsync(promises) {
+  let orderedDefered = []
+  let orderedPromises = []
+  for (let promise of promises) {
+    orderedPromises.push(
+      new Promise((resolve, reject) => {
+        orderedDefered.push({ resolve, reject })
+      })
+    )
+    promise
+      .then((...args) => {
+        orderedDefered.shift().resolve(...args)
+      })
+      .catch((...args) => {
+        orderedDefered.shift().reject(...args)
+      })
+  }
+  return orderedPromises
+}
+
 module.exports = {
-  promiseOn
+  streamOnAsync,
+  delayAsync,
+  orderedAsync
 }
