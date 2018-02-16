@@ -6,6 +6,7 @@ const http = require('http')
 
 const HttpClient = require('./httpclient')
 const HttpClientError = require('./httpclienterror')
+const AsyncUtils = require('./asyncutils')
 
 const {
   createTestHttpServer,
@@ -466,18 +467,12 @@ describe('HttpClient', () => {
 
     let testFile = tmpFile()
     let testStream = fs.createWriteStream(testFile)
+    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
 
     let stream = httpClient.putStream(`${httpBaseUrl}/echo`)
     stream.pipe(testStream)
     stream.write('Hello')
     stream.end()
-
-    // TODO: Move all test to this or do in-mem stream instead
-    let testStreamPromise = new Promise((resolve, reject) => {
-      testStream.on('finish', () => {
-        resolve()
-      })
-    })
 
     return testStreamPromise.then(() => stream.response).then(response => {
       let responseRes = expect(response, 'to satisfy', {
@@ -496,12 +491,15 @@ describe('HttpClient', () => {
     let httpClient = new HttpClient()
 
     let testFile = tmpFile()
+    let testStream = fs.createWriteStream(testFile)
+    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
+
     let stream = httpClient.patchStream(`${httpBaseUrl}/echo`)
-    stream.pipe(fs.createWriteStream(testFile))
+    stream.pipe(testStream)
     stream.write('Hello')
     stream.end()
 
-    return stream.response.then(response => {
+    return testStreamPromise.then(() => stream.response).then(response => {
       let responseRes = expect(response, 'to satisfy', {
         statusCode: 200
       })
@@ -557,12 +555,15 @@ describe('HttpClient', () => {
     let httpClient = new HttpClient()
 
     let testFile = tmpFile()
+    let testStream = fs.createWriteStream(testFile)
+    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
+
     let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
-    stream.pipe(fs.createWriteStream(testFile))
+    stream.pipe(testStream)
     stream.write('Hello')
     stream.end()
 
-    return stream.response.then(response => {
+    return testStreamPromise.then(() => stream.response).then(response => {
       let responseRes = expect(response, 'to satisfy', {
         statusCode: 200
       })
@@ -579,8 +580,11 @@ describe('HttpClient', () => {
     let httpClient = new HttpClient()
 
     let testFile = tmpFile()
+    let testStream = fs.createWriteStream(testFile)
+    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
+
     let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
-    stream.pipe(fs.createWriteStream(testFile))
+    stream.pipe(testStream)
     stream.write('Hello')
     setTimeout(() => {
       stream.write('Hello')
@@ -590,7 +594,7 @@ describe('HttpClient', () => {
       stream.end()
     }, 20)
 
-    return stream.response.then(response => {
+    return testStreamPromise.then(() => stream.response).then(response => {
       let responseRes = expect(response, 'to satisfy', {
         statusCode: 200
       })
@@ -607,10 +611,13 @@ describe('HttpClient', () => {
     let httpClient = new HttpClient()
 
     let testFile = tmpFile()
+    let testStream = fs.createWriteStream(testFile)
+    let testStreamPromise = AsyncUtils.promiseOn(testStream, 'finish')
+
     let stream = httpClient.postStream(`${httpBaseUrl}/echo`)
     stream.write('Hello')
     setTimeout(() => {
-      stream.pipe(fs.createWriteStream(testFile))
+      stream.pipe(testStream)
       stream.write('Hello')
     }, 10)
     setTimeout(() => {
@@ -618,7 +625,7 @@ describe('HttpClient', () => {
       stream.end()
     }, 20)
 
-    return stream.response.then(response => {
+    return testStreamPromise.then(() => stream.response).then(response => {
       let responseRes = expect(response, 'to satisfy', {
         statusCode: 200
       })

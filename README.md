@@ -30,7 +30,7 @@ httpClient.get('http://localhost:3000/')
 ## Queuing
 
 Queuing is done on each endpoint(protocol, host and port combination,
-fx. https://localhost:3000/). Limits are applied globally and per endpoint.
+fx. https://localhost:3000/. Limits are applied globally and per endpoint.
 
 ``` javascript
 let httpClient = new HttpClient({ maxTotalConcurrent: 4, maxConcurrent: 2, keepAlive: true })
