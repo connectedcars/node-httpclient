@@ -1,9 +1,11 @@
 const expect = require('unexpected')
+const { shuffleArray } = require('./testutils')
 
 const AsyncUtils = require('./asyncutils')
 
 describe('AsyncUtils', () => {
-  it('orderedAsync', async () => {
+  it('orderedAsync', function() {
+    this.slow(1000)
     let promises = []
     for (let i = 0; i < 10; i++) {
       promises.push(AsyncUtils.delayAsync(20 * i).then(() => i))
@@ -29,10 +31,3 @@ describe('AsyncUtils', () => {
     ])
   })
 })
-
-function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    let j = Math.floor(Math.random() * (i + 1))
-    ;[array[i], array[j]] = [array[j], array[i]]
-  }
-}

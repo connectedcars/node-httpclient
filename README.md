@@ -36,8 +36,8 @@ fx. https://localhost:3000/. Limits are applied globally and per endpoint.
 let httpClient = new HttpClient({ maxTotalConcurrent: 4, maxConcurrent: 2, keepAlive: true })
 let promises = []
 for (let i = 0; i < 4; i++) {
-    promises.push(httpClient.get(`http://host1/ok`), null)
-    promises.push(httpClient.get(`http://host2/ok`), null)
+  promises.push(httpClient.get(`http://host1/ok`), null)
+  promises.push(httpClient.get(`http://host2/ok`), null)
 }
 let results = await Promise.all(promises),
 ```
@@ -78,4 +78,21 @@ Gzip and deflate are supported.
 let response = await httpClient.get('http://localhost:3000/', {
    "Accept-Encoding": 'gzip, deflate'
 })
+let data = response.data
+```
+
+## Bulk request
+
+Do bulk request and return in order of resolve:
+
+``` javascript
+let responses = httpClient.requestBulk('GET', [
+  `http://localhost/delay/300`,
+  `http://localhost/delay/100`,
+  `http://localhost/delay/200`,
+  `http://localhost/delay/400`
+])
+for(let responsePromise of responses) {
+  let response = await responsePromise
+}
 ```

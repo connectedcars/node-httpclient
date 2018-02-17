@@ -9,6 +9,9 @@ const HttpClientStream = require('./httpclientstream')
 // Make vscode happy
 const Agent = http.Agent
 
+// TODO: Return refrences for request for bulk requests
+// TODO: Figure out if bulk makes sense for stream
+
 /**
  * @typedef RequestOptions
  * @property {Agent}  [agent=null] Custom HTTP agent
@@ -103,7 +106,26 @@ class HttpClient {
   request(method, url, headers, data, options) {
     return /** @type {Promise<HttpResponse>} */ (this._request(
       method,
-      url,
+      [url],
+      headers || {},
+      data,
+      options || {}
+    )[0])
+  }
+
+  /**
+   *
+   * @param {string} method Request method(GET, POST, PUT, PATCH, DELETE, HEAD)
+   * @param {Array<string>} urls Request url
+   * @param {Object} [headers] Request headers
+   * @param {Buffer|string} [data] Request body
+   * @param {RequestOptions} [options] Request options
+   * @returns {Array<Promise<HttpResponse>>}
+   */
+  requestBulk(method, urls, headers, data, options) {
+    return /** @type {Array<Promise<HttpResponse>>} */ (this._request(
+      method,
+      urls,
       headers || {},
       data,
       options || {}
@@ -190,11 +212,11 @@ class HttpClient {
     let requestOptions = Object.assign({ stream: true }, options || {})
     let stream = /** @type {HttpClientStream} */ (this._request(
       method,
-      url,
+      [url],
       headers || {},
       null,
       requestOptions
-    ))
+    )[0])
     return stream
   }
 
@@ -265,107 +287,115 @@ class HttpClient {
   /**
    * Internal function
    * @param {string} method Request method(GET, POST, PUT, PATCH, DELETE, HEAD)
-   * @param {string} url Request url
+   * @param {Array<string>} urls Request url
    * @param {Object} [headers] Request headers
    * @param {Buffer|string} [data] Request body
    * @param {RequestOptions} [options] Request options
-   * @returns {Promise<HttpResponse>|HttpClientStream}
+   * @returns {Array<Promise<HttpResponse>|HttpClientStream>}
    */
-  _request(method, url, headers, data, options) {
-    let pUrl = UrlParser.parse(url)
+  _request(method, urls, headers, data, options) {
+    let defered = []
+    let responsePromises = []
+    for (let url of urls) {
+      let pUrl = UrlParser.parse(url)
 
-    // Build request and options
-    let httpRequester
-    let httpAgent
-    let globalAgent
-    if (pUrl.protocol === 'http:') {
-      httpRequester = http.request
-      httpAgent = http.Agent
-      globalAgent = http.globalAgent
-      pUrl.port = pUrl.port || '80'
-    } else if (pUrl.protocol === 'https:') {
-      httpRequester = https.request
-      httpAgent = https.Agent
-      globalAgent = https.globalAgent
-      pUrl.port = pUrl.port || '443'
-    } else {
-      throw Error(`Unknown url type: ${url}`)
-    }
-
-    // Setup endpoint
-    let endpointName = `${pUrl.protocol}//${pUrl.hostname}:${pUrl.port}/`
-    let endpoint = this._endpoints[endpointName]
-    if (!endpoint) {
-      endpoint = Object.assign({}, this._defaultEndpoint)
-      endpoint.name = endpointName
-      if (options.agent || this._agent) {
-        endpoint.agent = options.agent || this._agent
-      } else if (this._keepAlive || options.keepAlive) {
-        endpoint.agent = new httpAgent({ keepAlive: true })
+      // Build request and options
+      let httpRequester
+      let httpAgent
+      let globalAgent
+      if (pUrl.protocol === 'http:') {
+        httpRequester = http.request
+        httpAgent = http.Agent
+        globalAgent = http.globalAgent
+        pUrl.port = pUrl.port || '80'
+      } else if (pUrl.protocol === 'https:') {
+        httpRequester = https.request
+        httpAgent = https.Agent
+        globalAgent = https.globalAgent
+        pUrl.port = pUrl.port || '443'
       } else {
-        endpoint.agent = globalAgent
+        throw Error(`Unknown url type: ${url}`)
       }
-      this._endpoints[endpointName] = endpoint
-    }
 
-    let httpOptions = {
-      host: pUrl.hostname,
-      port: pUrl.port,
-      path: pUrl.path,
-      method: method,
-      auth: pUrl.auth,
-      headers: headers,
-      agent: endpoint.agent,
-      ca: options.ca || this._ca,
-      key: options.clientKey || this._clientKey,
-      cert: options.clientCert || this._clientCert,
-      rejectUnauthorized:
-        options.rejectUnauthorized || this._rejectUnauthorized,
-      secureProtocol: options.secureProtocol || this._secureProtocol,
-      ciphers: options.ciphers || this._ciphers,
-      timeout: options.timeout || this._timeout
-    }
+      // Setup endpoint
+      let endpointName = `${pUrl.protocol}//${pUrl.hostname}:${pUrl.port}/`
+      let endpoint = this._endpoints[endpointName]
+      if (!endpoint) {
+        endpoint = Object.assign({}, this._defaultEndpoint)
+        endpoint.name = endpointName
+        if (options.agent || this._agent) {
+          endpoint.agent = options.agent || this._agent
+        } else if (this._keepAlive || options.keepAlive) {
+          endpoint.agent = new httpAgent({ keepAlive: true })
+        } else {
+          endpoint.agent = globalAgent
+        }
+        this._endpoints[endpointName] = endpoint
+      }
 
-    // Register for queue processing after we return the promise
-    process.nextTick(_processQueue, endpoint)
+      let httpOptions = {
+        host: pUrl.hostname,
+        port: pUrl.port,
+        path: pUrl.path,
+        method: method,
+        auth: pUrl.auth,
+        headers: headers,
+        agent: endpoint.agent,
+        ca: options.ca || this._ca,
+        key: options.clientKey || this._clientKey,
+        cert: options.clientCert || this._clientCert,
+        rejectUnauthorized:
+          options.rejectUnauthorized || this._rejectUnauthorized,
+        secureProtocol: options.secureProtocol || this._secureProtocol,
+        ciphers: options.ciphers || this._ciphers,
+        timeout: options.timeout || this._timeout
+      }
 
-    // Create stream
-    let stream = null
-    if (options.stream && !options.writeStream && !options.readStream) {
-      options.writeStream = true
-      options.readStream = true
-    }
-    if (options.writeStream || options.readStream) {
-      stream = new HttpClientStream()
-    }
+      // Register for queue processing after we return the promise
+      process.nextTick(_processQueue, endpoint)
 
-    // Add to request queue
-    let responsePromise = new Promise((resolve, reject) => {
-      endpoint.requests.push({
-        httpRequester,
-        httpOptions,
-        data,
-        resolve,
-        reject,
-        stream,
-        writeStream: options.writeStream,
-        readStream: options.readStream,
-        autoContentDecoding:
-          typeof options.autoContentDecoding === 'boolean'
-            ? options.autoContentDecoding
-            : this._autoContentDecoding,
-        maxResponseSize: options.maxResponseSize || this._maxResponseSize,
-        queuedTime: new Date().getTime(),
-        queuedHrTime: process.hrtime()
+      // Create stream
+      let stream = null
+      if (options.stream && !options.writeStream && !options.readStream) {
+        options.writeStream = true
+        options.readStream = true
+      }
+      if (options.writeStream || options.readStream) {
+        stream = new HttpClientStream()
+      }
+
+      // Add to request queue
+      let responsePromise = new Promise((resolve, reject) => {
+        defered.push({
+          resolve,
+          reject
+        })
+        endpoint.requests.push({
+          httpRequester,
+          httpOptions,
+          data,
+          defered,
+          stream,
+          writeStream: options.writeStream,
+          readStream: options.readStream,
+          autoContentDecoding:
+            typeof options.autoContentDecoding === 'boolean'
+              ? options.autoContentDecoding
+              : this._autoContentDecoding,
+          maxResponseSize: options.maxResponseSize || this._maxResponseSize,
+          queuedTime: new Date().getTime(),
+          queuedHrTime: process.hrtime()
+        })
       })
-    })
 
-    if (stream) {
-      stream.response = responsePromise
-      return stream
+      if (stream) {
+        stream.response = responsePromise
+        responsePromises.push(stream)
+      } else {
+        responsePromises.push(responsePromise)
+      }
     }
-
-    return responsePromise
+    return responsePromises
   }
 }
 
@@ -452,7 +482,7 @@ function _processQueue(endpoint) {
         endpoint.outstanding--
         endpoint.global.outstanding--
         if (!error) {
-          request.resolve({
+          request.defered.shift().resolve({
             timings: calculateTimings(),
             statusCode: response.statusCode,
             statusMessage: response.statusMessage,
@@ -460,7 +490,9 @@ function _processQueue(endpoint) {
             data: Buffer.concat(responseData)
           })
         } else {
-          request.reject(new HttpClientError(error, null, calculateTimings()))
+          request.defered
+            .shift()
+            .reject(new HttpClientError(error, null, calculateTimings()))
         }
         process.nextTick(_processQueue, endpoint) // Register for queue processing
       })
@@ -471,13 +503,15 @@ function _processQueue(endpoint) {
       initialResponseTime = process.hrtime()
       responseDataStartedTime = initialResponseTime
       responseReceivedTime = responseDataStartedTime
-      request.reject(new HttpClientError('Timeout', null, calculateTimings()))
+      request.defered
+        .shift()
+        .reject(new HttpClientError('Timeout', null, calculateTimings()))
       process.nextTick(_processQueue, endpoint) // Register for queue processing
     })
     httpRequest.on('error', e => {
       endpoint.outstanding--
       endpoint.global.outstanding--
-      request.reject(e)
+      request.defered.shift().reject(e)
       process.nextTick(_processQueue, endpoint) // Register for queue processing
     })
 

@@ -23,6 +23,7 @@ const localhostPrivateKey = fs.readFileSync(
 
 describe('HttpClient', () => {
   let [httpServer, httpListenPromise] = createTestHttpServer((req, res) => {
+    let match
     if (['PUT', 'PATCH', 'DELETE'].indexOf(req.method) >= 0) {
       res.end(req.method)
     } else if (['HEAD'].indexOf(req.method) >= 0) {
@@ -58,6 +59,10 @@ describe('HttpClient', () => {
       let deflated = zlib.deflateSync('ok')
       res.setHeader('content-encoding', 'deflate')
       res.end(deflated)
+    } else if ((match = req.url.match(/^\/delay\/(\d+)/))) {
+      setTimeout(() => {
+        res.end(match[1])
+      }, parseInt(match[1]))
     } else {
       res.statusCode = 404
       res.end()
@@ -700,5 +705,39 @@ describe('HttpClient', () => {
     return expect(stream.response, 'to be fulfilled with value satisfying', {
       statusCode: 200
     })
+  })
+
+  it('should return bulk results in order of resolve', function() {
+    this.slow(1000)
+    let httpClient = new HttpClient()
+    let responses = httpClient.requestBulk('GET', [
+      `${httpBaseUrl}/delay/300`,
+      `${httpBaseUrl}/delay/100`,
+      `${httpBaseUrl}/delay/200`,
+      `${httpBaseUrl}/delay/400`
+    ])
+
+    return expect(
+      Promise.all(responses),
+      'to be fulfilled with value satisfying',
+      [
+        {
+          statusCode: 200,
+          data: Buffer.from('100')
+        },
+        {
+          statusCode: 200,
+          data: Buffer.from('200')
+        },
+        {
+          statusCode: 200,
+          data: Buffer.from('300')
+        },
+        {
+          statusCode: 200,
+          data: Buffer.from('400')
+        }
+      ]
+    )
   })
 })
