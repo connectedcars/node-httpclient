@@ -12,6 +12,7 @@ Thin wrapper around node's http/https client that provides promises based api.
 * Custom CA and SSL/TLS validation
 * Client side certificates
 * Precise timing
+* [Bulk request](#bulk-request)
 
 ## Basic usage
 
@@ -86,7 +87,7 @@ let data = response.data
 Do bulk GET request and return in order of resolve:
 
 ``` javascript
-let responses = httpClient.getBulk([
+let responses = httpClient.getBatch([
   `http://localhost/delay/300`,
   `http://localhost/delay/100`,
   `http://localhost/delay/200`,
@@ -94,18 +95,19 @@ let responses = httpClient.getBulk([
 ])
 for(let responsePromise of responses) {
   let response = await responsePromise
+  // Order would be 100, 200, 300, 400
 }
 ```
 
 Do bulk POST request and return in order of resolve:
 
 ``` javascript
-let responses = httpClient.postBulk([
+let responses = httpClient.postBatch([
   `http://localhost/echo`,
   `http://localhost/echo`
 ], {
   'Content-Type': 'application/json'
-}, ['{ "payload": "1" }', '{ "payload": "1" }'])
+}, ['{ "payload": "1" }', '{ "payload": "2" }'])
 
 for(let responsePromise of responses) {
   let response = await responsePromise

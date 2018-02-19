@@ -24,7 +24,17 @@ const localhostPrivateKey = fs.readFileSync(
 describe('HttpClient', () => {
   let [httpServer, httpListenPromise] = createTestHttpServer((req, res) => {
     let match
-    if (['PUT', 'PATCH', 'DELETE'].indexOf(req.method) >= 0) {
+    if ((match = req.url.match(/^\/delay\/(\d+)/))) {
+      setTimeout(() => {
+        let chunks = []
+        req.on('data', chunk => {
+          chunks.push(chunk)
+        })
+        req.on('end', () => {
+          res.end(match[1] + Buffer.concat(chunks).toString('utf8'))
+        })
+      }, parseInt(match[1]))
+    } else if (['PUT', 'PATCH', 'DELETE'].indexOf(req.method) >= 0) {
       res.end(req.method)
     } else if (['HEAD'].indexOf(req.method) >= 0) {
       res.end()
@@ -59,10 +69,6 @@ describe('HttpClient', () => {
       let deflated = zlib.deflateSync('ok')
       res.setHeader('content-encoding', 'deflate')
       res.end(deflated)
-    } else if ((match = req.url.match(/^\/delay\/(\d+)/))) {
-      setTimeout(() => {
-        res.end(match[1])
-      }, parseInt(match[1]))
     } else {
       res.statusCode = 404
       res.end()
@@ -231,7 +237,8 @@ describe('HttpClient', () => {
     )
   })
 
-  it('should return 200 ok 8 times with 2 in parallel on http and https', () => {
+  it('should return 200 ok 8 times with 2 in parallel on http and https', function() {
+    this.slow(500)
     let httpClient = new HttpClient({
       maxConcurrent: 2,
       maxTotalConcurrent: 4,
@@ -385,6 +392,7 @@ describe('HttpClient', () => {
         })
     })
   })
+
   it('should fail with unknown protocol', () => {
     let httpClient = new HttpClient()
     return expect(
@@ -393,6 +401,19 @@ describe('HttpClient', () => {
       },
       'to throw',
       'Unknown url type: sftp://localhost/'
+    )
+  })
+
+  it('should fail with batch stream mixed', () => {
+    let httpClient = new HttpClient()
+    return expect(
+      () => {
+        httpClient.getBatch([`${httpBaseUrl}/ok`, `${httpBaseUrl}/ok`], null, {
+          stream: true
+        })
+      },
+      'to throw',
+      'Stream can not be mixed with batch'
     )
   })
 
@@ -707,10 +728,135 @@ describe('HttpClient', () => {
     })
   })
 
-  it('should return bulk results in order of resolve', function() {
+  it('should return bulk get results in order of resolve', function() {
     this.slow(1000)
     let httpClient = new HttpClient()
-    let responses = httpClient.requestBulk('GET', [
+    let responses = httpClient.getBatch(
+      [
+        `${httpBaseUrl}/delay/300`,
+        `${httpBaseUrl}/delay/100`,
+        `${httpBaseUrl}/delay/200`,
+        `${httpBaseUrl}/delay/400`
+      ],
+      [
+        {
+          'Content-type': 'application/json'
+        },
+        {
+          'Content-type': 'application/json'
+        },
+        {
+          'Content-type': 'application/json'
+        },
+        {
+          'Content-type': 'application/json'
+        }
+      ]
+    )
+
+    return expect(
+      Promise.all(responses),
+      'to be fulfilled with value satisfying',
+      [
+        {
+          statusCode: 200,
+          data: Buffer.from('100')
+        },
+        {
+          statusCode: 200,
+          data: Buffer.from('200')
+        },
+        {
+          statusCode: 200,
+          data: Buffer.from('300')
+        },
+        {
+          statusCode: 200,
+          data: Buffer.from('400')
+        }
+      ]
+    )
+  })
+
+  it('should return bulk post results in order of resolve', function() {
+    this.slow(1000)
+    let httpClient = new HttpClient()
+    let responses = httpClient.postBatch(
+      [`${httpBaseUrl}/delay/200`, `${httpBaseUrl}/delay/100`],
+      null,
+      ['Hello1', 'Hello2']
+    )
+
+    return expect(
+      Promise.all(responses),
+      'to be fulfilled with value satisfying',
+      [
+        {
+          statusCode: 200,
+          data: Buffer.from('100Hello2')
+        },
+        {
+          statusCode: 200,
+          data: Buffer.from('200Hello1')
+        }
+      ]
+    )
+  })
+
+  it('should return bulk patch results in order of resolve', function() {
+    this.slow(1000)
+    let httpClient = new HttpClient()
+    let responses = httpClient.putBatch(
+      [`${httpBaseUrl}/delay/200`, `${httpBaseUrl}/delay/100`],
+      null,
+      'Hello'
+    )
+
+    return expect(
+      Promise.all(responses),
+      'to be fulfilled with value satisfying',
+      [
+        {
+          statusCode: 200,
+          data: Buffer.from('100Hello')
+        },
+        {
+          statusCode: 200,
+          data: Buffer.from('200Hello')
+        }
+      ]
+    )
+  })
+
+  it('should return bulk patch results in order of resolve', function() {
+    this.slow(1000)
+    let httpClient = new HttpClient()
+    let responses = httpClient.patchBatch(
+      [`${httpBaseUrl}/delay/200`, `${httpBaseUrl}/delay/100`],
+      null,
+      'Hello'
+    )
+
+    return expect(
+      Promise.all(responses),
+      'to be fulfilled with value satisfying',
+      [
+        {
+          statusCode: 200,
+          data: Buffer.from('100Hello')
+        },
+        {
+          statusCode: 200,
+          data: Buffer.from('200Hello')
+        }
+      ]
+    )
+  })
+
+  it('should return bulk delete results in order of resolve', function() {
+    this.slow(1000)
+    let httpClient = new HttpClient()
+    let responses = httpClient.deleteBatch([
       `${httpBaseUrl}/delay/300`,
       `${httpBaseUrl}/delay/100`,
       `${httpBaseUrl}/delay/200`,
@@ -736,6 +882,48 @@ describe('HttpClient', () => {
         {
           statusCode: 200,
           data: Buffer.from('400')
+        }
+      ]
+    )
+  })
+
+  it('should return bulk head results in order of resolve', function() {
+    this.slow(1000)
+    let httpClient = new HttpClient()
+    let responses = httpClient.headBatch([
+      `${httpBaseUrl}/delay/300`,
+      `${httpBaseUrl}/delay/100`,
+      `${httpBaseUrl}/delay/200`,
+      `${httpBaseUrl}/delay/400`
+    ])
+
+    return expect(
+      Promise.all(responses),
+      'to be fulfilled with value satisfying',
+      [
+        {
+          statusCode: 200,
+          request: {
+            url: `${httpBaseUrl}/delay/100`
+          }
+        },
+        {
+          statusCode: 200,
+          request: {
+            url: `${httpBaseUrl}/delay/200`
+          }
+        },
+        {
+          statusCode: 200,
+          request: {
+            url: `${httpBaseUrl}/delay/300`
+          }
+        },
+        {
+          statusCode: 200,
+          request: {
+            url: `${httpBaseUrl}/delay/400`
+          }
         }
       ]
     )

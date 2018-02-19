@@ -117,12 +117,12 @@ class HttpClient {
    *
    * @param {string} method Request method(GET, POST, PUT, PATCH, DELETE, HEAD)
    * @param {Array<string>} urls Request url
-   * @param {Object} [headers] Request headers
-   * @param {Buffer|string} [data] Request body
+   * @param {Object|Array<Object>} [headers] Request headers
+   * @param {Buffer|string|Array<Buffer|string>} [data] Request body
    * @param {RequestOptions} [options] Request options
    * @returns {Array<Promise<HttpResponse>>}
    */
-  requestBulk(method, urls, headers, data, options) {
+  requestBatch(method, urls, headers, data, options) {
     return /** @type {Array<Promise<HttpResponse>>} */ (this._request(
       method,
       urls,
@@ -130,6 +130,75 @@ class HttpClient {
       data,
       options || {}
     ))
+  }
+
+  /**
+   *
+   * @param {Array<string>} urls Request url
+   * @param {Object|Array<Object>} [headers] Request headers
+   * @param {RequestOptions} [options] Request options
+   * @returns {Array<Promise<HttpResponse>>}
+   */
+  getBatch(urls, headers, options) {
+    return this.requestBatch('GET', urls, headers, null, options)
+  }
+
+  /**
+   *
+   * @param {Array<string>} urls Request url
+   * @param {Object|Array<Object>} [headers] Request headers
+   * @param {Buffer|string|Array<Buffer|string>} [data] Request body
+   * @param {RequestOptions} [options] Request options
+   * @returns {Array<Promise<HttpResponse>>}
+   */
+  postBatch(urls, headers, data, options) {
+    return this.requestBatch('POST', urls, headers, data, options)
+  }
+
+  /**
+   *
+   * @param {Array<string>} urls Request url
+   * @param {Object|Array<Object>} [headers] Request headers
+   * @param {Buffer|string|Array<Buffer|string>} [data] Request body
+   * @param {RequestOptions} [options] Request options
+   * @returns {Array<Promise<HttpResponse>>}
+   */
+  putBatch(urls, headers, data, options) {
+    return this.requestBatch('PUT', urls, headers, data, options)
+  }
+
+  /**
+   *
+   * @param {Array<string>} urls Request url
+   * @param {Object|Array<Object>} [headers] Request headers
+   * @param {Buffer|string|Array<Buffer|string>} [data] Request body
+   * @param {RequestOptions} [options] Request options
+   * @returns {Array<Promise<HttpResponse>>}
+   */
+  patchBatch(urls, headers, data, options) {
+    return this.requestBatch('PATCH', urls, headers, data, options)
+  }
+
+  /**
+   *
+   * @param {Array<string>} urls Request url
+   * @param {Object|Array<Object>} [headers] Request headers
+   * @param {RequestOptions} [options] Request options
+   * @returns {Array<Promise<HttpResponse>>}
+   */
+  deleteBatch(urls, headers, options) {
+    return this.requestBatch('DELETE', urls, headers, null, options)
+  }
+
+  /**
+   *
+   * @param {Array<string>} urls Request url
+   * @param {Object|Array<Object>} [headers] Request headers
+   * @param {RequestOptions} [options] Request options
+   * @returns {Array<Promise<HttpResponse>>}
+   */
+  headBatch(urls, headers, options) {
+    return this.requestBatch('HEAD', urls, headers, null, options)
   }
 
   /**
@@ -288,12 +357,19 @@ class HttpClient {
    * Internal function
    * @param {string} method Request method(GET, POST, PUT, PATCH, DELETE, HEAD)
    * @param {Array<string>} urls Request url
-   * @param {Object} [headers] Request headers
-   * @param {Buffer|string} [data] Request body
+   * @param {Object|Array<Object>} [headers] Request headers
+   * @param {Buffer|string|Array<Buffer|string>} [data] Request body
    * @param {RequestOptions} [options] Request options
    * @returns {Array<Promise<HttpResponse>|HttpClientStream>}
    */
   _request(method, urls, headers, data, options) {
+    if (
+      urls.length > 1 &&
+      (options.stream || options.writeStream || options.readStream)
+    ) {
+      throw new Error(`Stream can not be mixed with batch`)
+    }
+
     let defered = []
     let responsePromises = []
     for (let url of urls) {
@@ -339,7 +415,7 @@ class HttpClient {
         path: pUrl.path,
         method: method,
         auth: pUrl.auth,
-        headers: headers,
+        headers: Array.isArray(headers) ? headers.shift() : headers,
         agent: endpoint.agent,
         ca: options.ca || this._ca,
         key: options.clientKey || this._clientKey,
@@ -371,9 +447,14 @@ class HttpClient {
           reject
         })
         endpoint.requests.push({
+          requestInfo: {
+            method: httpOptions.method,
+            url,
+            headers: httpOptions.headers
+          },
           httpRequester,
           httpOptions,
-          data,
+          data: Array.isArray(data) ? data.shift() : data,
           defered,
           stream,
           writeStream: options.writeStream,
@@ -483,6 +564,7 @@ function _processQueue(endpoint) {
         endpoint.global.outstanding--
         if (!error) {
           request.defered.shift().resolve({
+            request: request.requestInfo,
             timings: calculateTimings(),
             statusCode: response.statusCode,
             statusMessage: response.statusMessage,
