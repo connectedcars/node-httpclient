@@ -83,15 +83,30 @@ let data = response.data
 
 ## Bulk request
 
-Do bulk request and return in order of resolve:
+Do bulk GET request and return in order of resolve:
 
 ``` javascript
-let responses = httpClient.requestBulk('GET', [
+let responses = httpClient.getBulk([
   `http://localhost/delay/300`,
   `http://localhost/delay/100`,
   `http://localhost/delay/200`,
   `http://localhost/delay/400`
 ])
+for(let responsePromise of responses) {
+  let response = await responsePromise
+}
+```
+
+Do bulk POST request and return in order of resolve:
+
+``` javascript
+let responses = httpClient.postBulk([
+  `http://localhost/echo`,
+  `http://localhost/echo`
+], {
+  'Content-Type': 'application/json'
+}, ['{ "payload": "1" }', '{ "payload": "1" }'])
+
 for(let responsePromise of responses) {
   let response = await responsePromise
 }
