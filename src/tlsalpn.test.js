@@ -85,6 +85,17 @@ describe('tls ALPN', () => {
               return tlsSocket
             }
           })
+          // Handle push streams
+          client.on('stream', (pushedStream, requestHeaders) => {
+            pushedStream.on('push', responseHeaders => {
+              console.log('PUSH')
+              console.log(JSON.stringify(responseHeaders, null, 2))
+            })
+            pushedStream.on('data', chunk => {
+              console.log(chunk.toString('utf8'))
+            })
+          })
+
           let req = client.request({
             ':path': '/'
           })
