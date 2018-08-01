@@ -42,6 +42,10 @@ describe('HttpClient', () => {
       //
     } else if (req.url === '/timeout_with_data') {
       res.write('.')
+    } else if (req.url === '/timeout_with_late_response') {
+      setTimeout(() => {
+        res.end()
+      }, 101)
     } else if (req.url === '/large_response') {
       res.statusCode = 200
       res.end('x'.repeat(1024))
@@ -368,6 +372,17 @@ describe('HttpClient', () => {
     let response = httpClient.get(`${httpBaseUrl}/timeout_with_data`, null, {
       timeout: 100
     })
+    return expect(
+      response,
+      'to be rejected with error satisfying',
+      new HttpClientError('Timeout')
+    )
+  })
+
+  it('should timeout with long response time', async function() {
+    let httpClient = new HttpClient({ timeout: 100 })
+    let response = httpClient.get(`${httpBaseUrl}/timeout_with_late_response`)
+    await new Promise(resolve => setTimeout(resolve, 500))
     return expect(
       response,
       'to be rejected with error satisfying',
