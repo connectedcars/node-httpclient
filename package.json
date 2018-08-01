@@ -7,7 +7,8 @@
     "node": ">=7.10.1"
   },
   "scripts": {
-    "test": "nyc --reporter=lcov --reporter=text mocha \"src/**/*.test.js\" \"bin/*.test.js\"",
+    "only-test": "mocha \"src/**/*.test.js\"",
+    "test": "nyc --reporter=lcov --reporter=text mocha \"src/**/*.test.js\"",
     "coveralls": "nyc report --reporter=text-lcov | coveralls"
   },
   "repository": {
@@ -24,18 +25,18 @@
   },
   "homepage": "https://github.com/connectedcars/node-httpclient#readme",
   "devDependencies": {
-    "@types/mocha": "^2.2.46",
-    "@types/node": "^8.5.8",
-    "babel-eslint": "^7.2.3",
-    "coveralls": "^2.13.3",
-    "eslint": "^4.15.0",
+    "@types/mocha": "^5.2.5",
+    "@types/node": "^10.5.5",
+    "babel-eslint": "^8.2.6",
+    "coveralls": "^3.0.2",
+    "eslint": "^5.2.0",
     "eslint-config-prettier": "^2.9.0",
-    "eslint-plugin-node": "^6.0.0",
-    "eslint-plugin-prettier": "^2.4.0",
-    "mocha": "^3.5.3",
-    "nyc": "^11.4.1",
-    "prettier": "^1.10.2",
-    "unexpected": "^10.36.2"
+    "eslint-plugin-node": "^7.0.1",
+    "eslint-plugin-prettier": "^2.6.2",
+    "mocha": "^5.2.0",
+    "nyc": "^12.0.2",
+    "prettier": "^1.14.0",
+    "unexpected": "^10.38.0"
   },
   "dependencies": {}
 }
