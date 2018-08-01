@@ -75,6 +75,7 @@ class HttpClient {
     this._maxResponseSize = options.maxResponseSize || 10 * 1024 * 1024
     this._keepAlive = options.keepAlive
     this._agent = options.agent
+    this._ownAgents = []
     this._ca = options.ca
     this._clientKey = options.clientKey
     this._clientCert = options.clientCert
@@ -356,6 +357,15 @@ class HttpClient {
   }
 
   /**
+   * Close any open sockets
+   */
+  close() {
+    for (let agent of this._ownAgents) {
+      agent.destroy()
+    }
+  }
+
+  /**
    * Internal function
    * @param {string} method Request method(GET, POST, PUT, PATCH, DELETE, HEAD)
    * @param {Array<string>} urls Request url
@@ -405,6 +415,7 @@ class HttpClient {
           endpoint.agent = options.agent || this._agent
         } else if (this._keepAlive || options.keepAlive) {
           endpoint.agent = new httpAgent({ keepAlive: true })
+          this._ownAgents.push(endpoint.agent)
         } else {
           endpoint.agent = globalAgent
         }
@@ -561,22 +572,31 @@ function _processQueue(endpoint) {
         })
       }
       responseStream.on('end', () => {
-        responseReceivedTime = process.hrtime()
-        endpoint.outstanding--
-        endpoint.global.outstanding--
-        if (!error) {
-          request.defered.shift().resolve({
-            request: request.requestInfo,
-            timings: calculateTimings(),
-            statusCode: response.statusCode,
-            statusMessage: response.statusMessage,
-            headers: response.headers,
-            data: Buffer.concat(responseData)
-          })
-        } else {
-          request.defered
-            .shift()
-            .reject(new HttpClientError(error, null, calculateTimings()))
+        if (request.defered.length > 0) {
+          responseReceivedTime = process.hrtime()
+          endpoint.outstanding--
+          endpoint.global.outstanding--
+          if (!error) {
+            request.defered.shift().resolve({
+              request: request.requestInfo,
+              timings: calculateTimings(),
+              statusCode: response.statusCode,
+              statusMessage: response.statusMessage,
+              headers: response.headers,
+              data: Buffer.concat(responseData)
+            })
+          } else {
+            request.defered
+              .shift()
+              .reject(
+                new HttpClientError(
+                  request.requestInfo,
+                  error,
+                  null,
+                  calculateTimings()
+                )
+              )
+          }
         }
         process.nextTick(_processQueue, endpoint) // Register for queue processing
       })
@@ -587,15 +607,28 @@ function _processQueue(endpoint) {
       initialResponseTime = process.hrtime()
       responseDataStartedTime = initialResponseTime
       responseReceivedTime = responseDataStartedTime
-      request.defered
-        .shift()
-        .reject(new HttpClientError('Timeout', null, calculateTimings()))
+      httpRequest.abort()
+      /* istanbul ignore next: we should never have a case where timeout is called and defered is empty */
+      if (request.defered.length > 0) {
+        request.defered
+          .shift()
+          .reject(
+            new HttpClientError(
+              request.requestInfo,
+              'Timeout',
+              null,
+              calculateTimings()
+            )
+          )
+      }
       process.nextTick(_processQueue, endpoint) // Register for queue processing
     })
     httpRequest.on('error', e => {
       endpoint.outstanding--
       endpoint.global.outstanding--
-      request.defered.shift().reject(e)
+      if (request.defered.length > 0) {
+        request.defered.shift().reject(e)
+      }
       process.nextTick(_processQueue, endpoint) // Register for queue processing
     })
 

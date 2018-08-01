@@ -1,5 +1,6 @@
-function HttpClientError(message, statusCode = null, timings = {}) {
+function HttpClientError(request, message, statusCode = null, timings = {}) {
   this.name = 'HttpClientError'
+  this.request = request
   this.statusCode = statusCode
   this.message = message
   this.timings = timings

@@ -22,77 +22,92 @@ const localhostPrivateKey = fs.readFileSync(
 )
 
 describe('HttpClient', () => {
-  let [httpServer, httpListenPromise] = createTestHttpServer((req, res) => {
-    let match
-    if ((match = req.url.match(/^\/delay\/(\d+)/))) {
-      setTimeout(() => {
-        let chunks = []
-        req.on('data', chunk => {
-          chunks.push(chunk)
-        })
-        req.on('end', () => {
-          res.end(match[1] + Buffer.concat(chunks).toString('utf8'))
-        })
-      }, parseInt(match[1]))
-    } else if (['PUT', 'PATCH', 'DELETE'].indexOf(req.method) >= 0) {
-      res.end(req.method)
-    } else if (['HEAD'].indexOf(req.method) >= 0) {
-      res.end()
-    } else if (req.url === '/timeout') {
-      //
-    } else if (req.url === '/timeout_with_data') {
-      res.write('.')
-    } else if (req.url === '/timeout_with_late_response') {
-      setTimeout(() => {
-        res.end()
-      }, 101)
-    } else if (req.url === '/large_response') {
-      res.statusCode = 200
-      res.end('x'.repeat(1024))
-    } else if (req.url === '/chunked') {
-      res.statusCode = 200
-      res.write('x')
-      setTimeout(() => {
-        res.end('x')
-      })
-    } else if (req.url === '/echo') {
-      res.statusCode = 200
-      req.on('data', data => {
-        res.write(data)
-      })
-      req.on('end', () => {
-        res.end()
-      })
-    } else if (req.url === '/ok') {
-      res.end('OK')
-    } else if (req.url === '/gzip') {
-      let gziped = zlib.gzipSync('ok')
-      res.setHeader('content-encoding', 'gzip')
-      res.end(gziped)
-    } else if (req.url === '/deflate') {
-      let deflated = zlib.deflateSync('ok')
-      res.setHeader('content-encoding', 'deflate')
-      res.end(deflated)
-    } else {
-      res.statusCode = 404
-      res.end()
-    }
-  })
-  let [httpsServer, httpsListenPromise] = createTestHttpsServer(
-    { cert: localhostCertificate, key: localhostPrivateKey },
-    (req, res) => {
-      res.statusCode = 200
-      res.end()
-    }
-  )
-
-  let [resetServer, resetServerPromise] = createTestHttpServer((req, res) => {})
-
   // Setup httpRequestHandler
+  let httpServer
+  let httpsServer
+  let resetServer
+  let keepAliveHttpAgent
   let httpBaseUrl = null
   let httpsBaseUrl = null
   let resetPort = null
   before(done => {
+    // Create server to test http
+    let httpListenPromise
+    ;[httpServer, httpListenPromise] = createTestHttpServer((req, res) => {
+      let match
+      if ((match = req.url.match(/^\/delay\/(\d+)/))) {
+        setTimeout(() => {
+          let chunks = []
+          req.on('data', chunk => {
+            chunks.push(chunk)
+          })
+          req.on('end', () => {
+            res.end(match[1] + Buffer.concat(chunks).toString('utf8'))
+          })
+        }, parseInt(match[1]))
+      } else if (['PUT', 'PATCH', 'DELETE'].indexOf(req.method) >= 0) {
+        res.end(req.method)
+      } else if (['HEAD'].indexOf(req.method) >= 0) {
+        res.end()
+      } else if (req.url === '/timeout') {
+        //
+      } else if (req.url === '/timeout_with_data') {
+        res.write('.')
+      } else if (req.url === '/timeout_with_late_response') {
+        setTimeout(() => {
+          res.end()
+        }, 101)
+      } else if (req.url === '/large_response') {
+        res.statusCode = 200
+        res.end('x'.repeat(1024))
+      } else if (req.url === '/chunked') {
+        res.statusCode = 200
+        res.write('x')
+        setTimeout(() => {
+          res.end('x')
+        })
+      } else if (req.url === '/echo') {
+        res.statusCode = 200
+        req.on('data', data => {
+          res.write(data)
+        })
+        req.on('end', () => {
+          res.end()
+        })
+      } else if (req.url === '/ok') {
+        res.end('OK')
+      } else if (req.url === '/gzip') {
+        let gziped = zlib.gzipSync('ok')
+        res.setHeader('content-encoding', 'gzip')
+        res.end(gziped)
+      } else if (req.url === '/deflate') {
+        let deflated = zlib.deflateSync('ok')
+        res.setHeader('content-encoding', 'deflate')
+        res.end(deflated)
+      } else {
+        res.statusCode = 404
+        res.end()
+      }
+    })
+
+    // Create server to test https
+    let httpsListenPromise
+    ;[httpsServer, httpsListenPromise] = createTestHttpsServer(
+      { cert: localhostCertificate, key: localhostPrivateKey },
+      (req, res) => {
+        res.statusCode = 200
+        res.end()
+      }
+    )
+
+    // Create server to test tcp resets
+    let resetServerPromise
+    ;[resetServer, resetServerPromise] = createTestHttpServer((req, res) => {})
+
+    // Creat keepAlive agent for testing
+    keepAliveHttpAgent = new http.Agent({ keepAlive: true })
+
+    // Wait for all servers to start
     Promise.all([
       httpListenPromise,
       httpsListenPromise,
@@ -112,6 +127,8 @@ describe('HttpClient', () => {
   after(() => {
     httpServer.close()
     httpsServer.close()
+    resetServer.close()
+    keepAliveHttpAgent.destroy()
   })
 
   it('should return 200 ok', () => {
@@ -134,7 +151,7 @@ describe('HttpClient', () => {
 
   it('should return 200 ok with agent', () => {
     let httpClient = new HttpClient({
-      agent: new http.Agent({ keepAlive: true })
+      agent: keepAliveHttpAgent
     })
     let response = httpClient.get(`${httpBaseUrl}/ok`)
     return expect(response, 'to be fulfilled with value satisfying', {
@@ -221,24 +238,25 @@ describe('HttpClient', () => {
       promises.push(httpClient.get(`${httpBaseUrl}/ok`))
     }
 
-    return expect(
-      Promise.all(promises),
-      'to be fulfilled with value satisfying',
-      [
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        }
-      ]
-    )
+    let cleanupPromise = Promise.all(promises).then(res => {
+      httpClient.close()
+      return res
+    })
+
+    return expect(cleanupPromise, 'to be fulfilled with value satisfying', [
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      }
+    ])
   })
 
   it('should return 200 ok 8 times with 2 in parallel on http and https', function() {
@@ -256,36 +274,37 @@ describe('HttpClient', () => {
       )
     }
 
-    return expect(
-      Promise.all(promises),
-      'to be fulfilled with value satisfying',
-      [
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        },
-        {
-          statusMessage: 'OK'
-        }
-      ]
-    )
+    let cleanupPromise = Promise.all(promises).then(res => {
+      httpClient.close()
+      return res
+    })
+
+    return expect(cleanupPromise, 'to be fulfilled with value satisfying', [
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      },
+      {
+        statusMessage: 'OK'
+      }
+    ])
   })
 
   it('should return 200 ok for chunked reply', () => {
@@ -342,7 +361,7 @@ describe('HttpClient', () => {
     return expect(
       response,
       'to be rejected with error satisfying',
-      new HttpClientError('Response too lange')
+      new HttpClientError({}, 'Response too lange')
     )
   })
 
@@ -362,7 +381,7 @@ describe('HttpClient', () => {
     return expect(
       response,
       'to be rejected with error satisfying',
-      new HttpClientError('Timeout')
+      new HttpClientError({}, 'Timeout')
     )
   })
 
@@ -375,18 +394,17 @@ describe('HttpClient', () => {
     return expect(
       response,
       'to be rejected with error satisfying',
-      new HttpClientError('Timeout')
+      new HttpClientError({}, 'Timeout')
     )
   })
 
-  it('should timeout with long response time', async function() {
+  it('should timeout with long response time', () => {
     let httpClient = new HttpClient({ timeout: 100 })
     let response = httpClient.get(`${httpBaseUrl}/timeout_with_late_response`)
-    await new Promise(resolve => setTimeout(resolve, 500))
     return expect(
-      response,
+      Promise.all([response, new Promise(resolve => setTimeout(resolve, 500))]),
       'to be rejected with error satisfying',
-      new HttpClientError('Timeout')
+      new HttpClientError({}, 'Timeout')
     )
   })
 
@@ -689,7 +707,7 @@ describe('HttpClient', () => {
     let endCount = 0
     setTimeout(() => {
       stream.on('data', chunk => {
-        chunks.push(chunk.toString('utf8'))
+        chunks.push(chunk.toString())
       })
       stream.on('end', () => {
         endCount++
