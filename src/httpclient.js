@@ -11,6 +11,8 @@ const Agent = http.Agent
 
 // TODO: Return refrences for request for bulk requests
 // TODO: Figure out if bulk makes sense for stream
+// TODO: Do lifecycle handling for sockets(needed for HTTP2 when doing ALPN)
+//       and get rid of http.agent as we are handling most of the work anyway
 
 /**
  * @typedef RequestOptions
