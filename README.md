@@ -105,9 +105,10 @@ let responses = httpClient.getBatch([
   `http://localhost/delay/200`,
   `http://localhost/delay/400`
 ])
-for(let responsePromise of responses) {
-  let response = await responsePromise
-  // Order would be 100, 200, 300, 400
+
+for await (let response of responses) {
+    console.log(response.statusCode)
+    // Order would be 100, 200, 300, 400
 }
 ```
 
@@ -116,21 +117,38 @@ Do bulk POST request and return in order of resolve:
 ``` javascript
 let responses = httpClient.postBatch([
   { url: `http://localhost/echo`, headers: { 'Content-Type': 'application/json' }, data: '{ "payload": "1" }' },
-  { url: `http://localhost/echo`, headers: { 'Content-Type': 'application/json' }, data: '{ "payload": "1" }' }
+  { url: `http://localhost/echo`, headers: { 'Content-Type': 'application/json' }, data: '{ "payload": "2" }' }
 ])
 
-for(let responsePromise of responses) {
-  let response = await responsePromise
+for await (let response of responses) {
+    console.log(response.statusCode)
 }
 ```
 
 ## Response handler
 
+Global http authentication handler:
+
+``` javascript
+let httpClient = new HttpClient( {
+  responseHandler: (res, nextReq, count) => {
+    if(res.statusCode === 403 && count < 2) {
+      nextReq.headers['Authorization'] = 'Basic YWxhZGRpbjpvcGVuc2VzYW1l'
+      return false
+    }
+    return res
+  }
+} )
+let response = httpClient.get('http://localhost/test')
+```
+
+Local http authentication handler:
+
 ``` javascript
 let response = httpClient.get('http://localhost/test', {
   Authorization: 'Basic YWxhZGRpbjpvcGVuc2VzYW1l'
 }, {
-  handler: (res, nextReq, count) => {
+  responseHandler: (res, nextReq, count) => {
     if(res.statusCode === 403 && count < 2) {
       nextReq.headers['Authorization'] = 'Basic YWxhZGRpbjpvcGVuc2VzYW1l'
       return false
