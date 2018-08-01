@@ -37,8 +37,9 @@ fx. https://localhost:3000/. Limits are applied globally and per endpoint.
 let httpClient = new HttpClient({ maxTotalConcurrent: 4, maxConcurrent: 2, keepAlive: true })
 let promises = []
 for (let i = 0; i < 4; i++) {
-  promises.push(httpClient.get(`http://host1/ok`), null)
-  promises.push(httpClient.get(`http://host2/ok`), null)
+  promises.push(httpClient.get(`http://host1/ok`))
+  promises.push(httpClient.get(`http://host2/ok`))
+  promises.push(httpClient.post(`http://host2/ok`), null, 'Post data')
 }
 let results = await Promise.all(promises),
 ```
@@ -56,6 +57,11 @@ let response = await stream.response
 Upload large file from read stream and save response body to file:
 
 ``` javascript
+let response = httpClient.postStream(`http://localhost/echo`)
+fs.createReadStream('/tmp/largefile').pipe(response)
+response.pipe(fs.createWriteStream('/tmp/uploadresponsebody'))
+let res = await response
+
 let stream = httpClient.postStream(`http://localhost/echo`)
 fs.createReadStream('/tmp/largefile').pipe(stream)
 stream.pipe(fs.createWriteStream('/tmp/uploadresponsebody'))
@@ -103,13 +109,27 @@ Do bulk POST request and return in order of resolve:
 
 ``` javascript
 let responses = httpClient.postBatch([
-  `http://localhost/echo`,
-  `http://localhost/echo`
-], {
-  'Content-Type': 'application/json'
-}, ['{ "payload": "1" }', '{ "payload": "2" }'])
+  { url: `http://localhost/echo`, headers: { 'Content-Type': 'application/json' }, data: '{ "payload": "1" }' },
+  { url: `http://localhost/echo`, headers: { 'Content-Type': 'application/json' }, data: '{ "payload": "1" }' }
+])
 
 for(let responsePromise of responses) {
   let response = await responsePromise
 }
+```
+
+## Response handler
+
+``` javascript
+let response = httpClient.get('http://localhost/test', {
+  Authorization: 'Basic YWxhZGRpbjpvcGVuc2VzYW1l'
+}, {
+  handler: (res, nextReq, count) => {
+    if(res.statusCode === 403 && count < 2) {
+      nextReq.headers['Authorization'] = 'Basic YWxhZGRpbjpvcGVuc2VzYW1l'
+      return false
+    }
+    return res
+  }
+})
 ```
