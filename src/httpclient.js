@@ -3,13 +3,13 @@ const http = require('http')
 const https = require('https')
 const zlib = require('zlib')
 
+const AsyncArray = require('./asyncarray')
 const HttpClientError = require('./httpclienterror')
 const HttpClientStream = require('./httpclientstream')
 
 // Make vscode happy
 const Agent = http.Agent
 
-// TODO: Return refrences for request for bulk requests
 // TODO: Figure out if bulk makes sense for stream
 // TODO: Do lifecycle handling for sockets(needed for HTTP2 when doing ALPN)
 //       and get rid of http.agent as we are handling most of the work anyway
@@ -123,16 +123,18 @@ class HttpClient {
    * @param {Object|Array<Object>} [headers] Request headers
    * @param {Buffer|string|Array<Buffer|string>} [data] Request body
    * @param {RequestOptions} [options] Request options
-   * @returns {Array<Promise<HttpResponse>>}
+   * @returns {AsyncArray<Promise<HttpResponse>>}
    */
   requestBatch(method, urls, headers, data, options) {
-    return /** @type {Array<Promise<HttpResponse>>} */ (this._request(
+    /** @type {AsyncArray<Promise<HttpResponse>>} */
+    let promiseArray = this._request(
       method,
       urls,
       headers || {},
       data,
       options || {}
-    ))
+    )
+    return new AsyncArray(...promiseArray)
   }
 
   /**
@@ -140,7 +142,7 @@ class HttpClient {
    * @param {Array<string>} urls Request url
    * @param {Object|Array<Object>} [headers] Request headers
    * @param {RequestOptions} [options] Request options
-   * @returns {Array<Promise<HttpResponse>>}
+   * @returns {AsyncArray<Promise<HttpResponse>>}
    */
   getBatch(urls, headers, options) {
     return this.requestBatch('GET', urls, headers, null, options)
@@ -152,7 +154,7 @@ class HttpClient {
    * @param {Object|Array<Object>} [headers] Request headers
    * @param {Buffer|string|Array<Buffer|string>} [data] Request body
    * @param {RequestOptions} [options] Request options
-   * @returns {Array<Promise<HttpResponse>>}
+   * @returns {AsyncArray<Promise<HttpResponse>>}
    */
   postBatch(urls, headers, data, options) {
     return this.requestBatch('POST', urls, headers, data, options)
@@ -164,7 +166,7 @@ class HttpClient {
    * @param {Object|Array<Object>} [headers] Request headers
    * @param {Buffer|string|Array<Buffer|string>} [data] Request body
    * @param {RequestOptions} [options] Request options
-   * @returns {Array<Promise<HttpResponse>>}
+   * @returns {AsyncArray<Promise<HttpResponse>>}
    */
   putBatch(urls, headers, data, options) {
     return this.requestBatch('PUT', urls, headers, data, options)
@@ -176,7 +178,7 @@ class HttpClient {
    * @param {Object|Array<Object>} [headers] Request headers
    * @param {Buffer|string|Array<Buffer|string>} [data] Request body
    * @param {RequestOptions} [options] Request options
-   * @returns {Array<Promise<HttpResponse>>}
+   * @returns {AsyncArray<Promise<HttpResponse>>}
    */
   patchBatch(urls, headers, data, options) {
     return this.requestBatch('PATCH', urls, headers, data, options)
@@ -187,7 +189,7 @@ class HttpClient {
    * @param {Array<string>} urls Request url
    * @param {Object|Array<Object>} [headers] Request headers
    * @param {RequestOptions} [options] Request options
-   * @returns {Array<Promise<HttpResponse>>}
+   * @returns {AsyncArray<Promise<HttpResponse>>}
    */
   deleteBatch(urls, headers, options) {
     return this.requestBatch('DELETE', urls, headers, null, options)
@@ -198,7 +200,7 @@ class HttpClient {
    * @param {Array<string>} urls Request url
    * @param {Object|Array<Object>} [headers] Request headers
    * @param {RequestOptions} [options] Request options
-   * @returns {Array<Promise<HttpResponse>>}
+   * @returns {AsyncArray<Promise<HttpResponse>>}
    */
   headBatch(urls, headers, options) {
     return this.requestBatch('HEAD', urls, headers, null, options)
@@ -372,7 +374,7 @@ class HttpClient {
    * @param {Object|Array<Object>} [headers] Request headers
    * @param {Buffer|string|Array<Buffer|string>} [data] Request body
    * @param {RequestOptions} [options] Request options
-   * @returns {Array<Promise<HttpResponse>|HttpClientStream>}
+   * @returns {AsyncArray<Promise<HttpResponse>|HttpClientStream>}
    */
   _request(method, urls, headers, data, options) {
     if (

@@ -131,8 +131,8 @@ Global http authentication handler:
 
 ``` javascript
 let httpClient = new HttpClient( {
-  responseHandler: (res, nextReq, count, options) => {
-    if(res.statusCode === 401 && count < 2) {
+  responseHandler: (res, nextReq, reqCount, options) => {
+    if(res.statusCode === 401 && retryCount < 2) {
       nextReq.headers['Authorization'] = 'Basic YWxhZGRpbjpvcGVuc2VzYW1l'
       return new Promise(resolve => setTimeout(resolve, 1000 * count)) // Delay next request
     }
@@ -151,7 +151,7 @@ Local http authentication handler:
 let response = httpClient.get('http://localhost/test', {
   Authorization: 'Basic YWxhZGRpbjpvcGVuc2VzYW1l'
 }, {
-  responseHandler: (res, nextReq, count) => {
+  responseHandler: (res, nextReq, reqCount) => {
     if(res.statusCode === 401 && count < 2) {
       nextReq.headers['Authorization'] = 'Basic YWxhZGRpbjpvcGVuc2VzYW1l'
       return false

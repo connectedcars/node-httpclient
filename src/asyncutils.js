@@ -37,8 +37,17 @@ function orderedAsync(promises) {
   return orderedPromises
 }
 
+function isPromise(value) {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof value.then === 'function'
+  )
+}
+
 module.exports = {
   streamOnAsync,
   delayAsync,
-  orderedAsync
+  orderedAsync,
+  isPromise
 }
