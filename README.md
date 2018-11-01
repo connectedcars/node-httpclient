@@ -125,7 +125,7 @@ for await (let response of responses) {
 }
 ```
 
-## Response handler
+## Response handler (Not implemented)
 
 Global http authentication handler:
 
