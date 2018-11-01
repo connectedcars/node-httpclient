@@ -25,7 +25,7 @@ npm install @connectedcars/httpclient
 ``` javascript
 const { HttpClient } = require('@connectedcars/httpclient')
 let httpClient = new HttpClient()
-let response = httpClient.get('http://localhost:3000/')
+let response = await httpClient.get('http://localhost:3000/')
 // {
 //    statusCode: 200,
 //    statusMessage: 'OK',
