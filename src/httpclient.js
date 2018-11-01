@@ -126,14 +126,13 @@ class HttpClient {
    * @returns {AsyncArray<Promise<HttpResponse>>}
    */
   requestBatch(method, urls, headers, data, options) {
-    /** @type {AsyncArray<Promise<HttpResponse>>} */
-    let promiseArray = this._request(
+    let promiseArray = /** @type {Array<Promise<HttpResponse>>} */ (this._request(
       method,
       urls,
       headers || {},
       data,
       options || {}
-    )
+    ))
     return new AsyncArray(...promiseArray)
   }
 
@@ -374,7 +373,7 @@ class HttpClient {
    * @param {Object|Array<Object>} [headers] Request headers
    * @param {Buffer|string|Array<Buffer|string>} [data] Request body
    * @param {RequestOptions} [options] Request options
-   * @returns {AsyncArray<Promise<HttpResponse>|HttpClientStream>}
+   * @returns {Array<Promise<HttpResponse>|HttpClientStream>}
    */
   _request(method, urls, headers, data, options) {
     if (
