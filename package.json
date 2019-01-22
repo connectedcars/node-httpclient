@@ -1,6 +1,6 @@
 {
   "name": "@connectedcars/httpclient",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Zero dependency http client for Node 8.x+",
   "main": "src/index.js",
   "engines": {
