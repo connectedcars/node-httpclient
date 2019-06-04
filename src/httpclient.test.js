@@ -533,17 +533,19 @@ describe('HttpClient', () => {
     stream.write('Hello')
     stream.end()
 
-    return testStreamPromise.then(() => stream.response).then(response => {
-      let responseRes = expect(response, 'to satisfy', {
-        statusCode: 200
+    return testStreamPromise
+      .then(() => stream.response)
+      .then(response => {
+        let responseRes = expect(response, 'to satisfy', {
+          statusCode: 200
+        })
+        let chunksRes = expect(
+          fs.readFileSync(testFile, 'utf8'),
+          'to equal',
+          'PUT'
+        )
+        return Promise.all([responseRes, chunksRes])
       })
-      let chunksRes = expect(
-        fs.readFileSync(testFile, 'utf8'),
-        'to equal',
-        'PUT'
-      )
-      return Promise.all([responseRes, chunksRes])
-    })
   })
 
   it('should return 200 for stream PATCH', () => {
@@ -558,17 +560,19 @@ describe('HttpClient', () => {
     stream.write('Hello')
     stream.end()
 
-    return testStreamPromise.then(() => stream.response).then(response => {
-      let responseRes = expect(response, 'to satisfy', {
-        statusCode: 200
+    return testStreamPromise
+      .then(() => stream.response)
+      .then(response => {
+        let responseRes = expect(response, 'to satisfy', {
+          statusCode: 200
+        })
+        let chunksRes = expect(
+          fs.readFileSync(testFile, 'utf8'),
+          'to equal',
+          'PATCH'
+        )
+        return Promise.all([responseRes, chunksRes])
       })
-      let chunksRes = expect(
-        fs.readFileSync(testFile, 'utf8'),
-        'to equal',
-        'PATCH'
-      )
-      return Promise.all([responseRes, chunksRes])
-    })
   })
 
   it('should return 200 for stream request', () => {
@@ -622,17 +626,19 @@ describe('HttpClient', () => {
     stream.write('Hello')
     stream.end()
 
-    return testStreamPromise.then(() => stream.response).then(response => {
-      let responseRes = expect(response, 'to satisfy', {
-        statusCode: 200
+    return testStreamPromise
+      .then(() => stream.response)
+      .then(response => {
+        let responseRes = expect(response, 'to satisfy', {
+          statusCode: 200
+        })
+        let chunksRes = expect(
+          fs.readFileSync(testFile, 'utf8'),
+          'to equal',
+          'Hello'
+        )
+        return Promise.all([responseRes, chunksRes])
       })
-      let chunksRes = expect(
-        fs.readFileSync(testFile, 'utf8'),
-        'to equal',
-        'Hello'
-      )
-      return Promise.all([responseRes, chunksRes])
-    })
   })
 
   it('should stream HelloHelloHello with postStream and delayed writes', () => {
@@ -653,17 +659,19 @@ describe('HttpClient', () => {
       stream.end()
     }, 20)
 
-    return testStreamPromise.then(() => stream.response).then(response => {
-      let responseRes = expect(response, 'to satisfy', {
-        statusCode: 200
+    return testStreamPromise
+      .then(() => stream.response)
+      .then(response => {
+        let responseRes = expect(response, 'to satisfy', {
+          statusCode: 200
+        })
+        let chunksRes = expect(
+          fs.readFileSync(testFile, 'utf8'),
+          'to equal',
+          'HelloHelloHello'
+        )
+        return Promise.all([responseRes, chunksRes])
       })
-      let chunksRes = expect(
-        fs.readFileSync(testFile, 'utf8'),
-        'to equal',
-        'HelloHelloHello'
-      )
-      return Promise.all([responseRes, chunksRes])
-    })
   })
 
   it('should stream HelloHello with postStream and delayed pipe setup', () => {
@@ -684,17 +692,19 @@ describe('HttpClient', () => {
       stream.end()
     }, 20)
 
-    return testStreamPromise.then(() => stream.response).then(response => {
-      let responseRes = expect(response, 'to satisfy', {
-        statusCode: 200
+    return testStreamPromise
+      .then(() => stream.response)
+      .then(response => {
+        let responseRes = expect(response, 'to satisfy', {
+          statusCode: 200
+        })
+        let chunksRes = expect(
+          fs.readFileSync(testFile, 'utf8'),
+          'to equal',
+          'HelloHelloHello'
+        )
+        return Promise.all([responseRes, chunksRes])
       })
-      let chunksRes = expect(
-        fs.readFileSync(testFile, 'utf8'),
-        'to equal',
-        'HelloHelloHello'
-      )
-      return Promise.all([responseRes, chunksRes])
-    })
   })
 
   it('should stream HelloHello with postStream and own setup', () => {

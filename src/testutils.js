@@ -10,6 +10,8 @@ const crypto = require('crypto')
 // Make ts-check happy
 const HttpServer = http.Server
 const HttpsServer = https.Server
+const IncomingMessage = http.IncomingMessage
+const ServerResponse = http.ServerResponse
 
 /**
  * @typedef {Object} listenResponse
@@ -19,7 +21,7 @@ const HttpsServer = https.Server
 
 /**
  * Start a test http server
- * @param {*} requestHandler
+ * @param {(request: IncomingMessage, response: ServerResponse) => void} requestHandler
  * @returns {[HttpServer,Promise<listenResponse>]}
  */
 function createTestHttpServer(requestHandler) {
@@ -39,7 +41,7 @@ function createTestHttpServer(requestHandler) {
 
 /**
  * Start a test http server
- * @param {*} requestHandler
+ * @param {(IncomingMessage, ServerResponse) => void} requestHandler
  * @returns {[HttpsServer,Promise<listenResponse>]}
  */
 function createTestHttpsServer(options, requestHandler) {
