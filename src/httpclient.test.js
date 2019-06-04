@@ -74,6 +74,9 @@ describe('HttpClient', () => {
         req.on('end', () => {
           res.end()
         })
+      } else if (req.url === '/echo_authorization_header') {
+        res.statusCode = 200
+        res.end(req.headers['authorization'])
       } else if (req.url === '/ok') {
         res.end('OK')
       } else if (req.url === '/gzip') {
@@ -131,7 +134,7 @@ describe('HttpClient', () => {
     keepAliveHttpAgent.destroy()
   })
 
-  it('should return 200 ok', () => {
+  it('should return 200 ok by get', () => {
     let httpClient = new HttpClient()
     let response = httpClient.get(`${httpBaseUrl}/ok`)
     return expect(response, 'to be fulfilled with value satisfying', {
@@ -140,7 +143,33 @@ describe('HttpClient', () => {
     })
   })
 
-  it('should return 200 ok', () => {
+  it('should return 200 ok and set header by get', () => {
+    let httpClient = new HttpClient({
+      headers: { Authorization: 'Bearer 1234' }
+    })
+    let response = httpClient.get(`${httpBaseUrl}/echo_authorization_header`)
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK',
+      data: Buffer.from('Bearer 1234')
+    })
+  })
+
+  it('should return 200 ok and override header by get', () => {
+    let httpClient = new HttpClient({
+      headers: { Authorization: 'Bearer 1234' }
+    })
+    let response = httpClient.get(`${httpBaseUrl}/echo_authorization_header`, {
+      Authorization: 'Bearer 4321'
+    })
+    return expect(response, 'to be fulfilled with value satisfying', {
+      statusCode: 200,
+      statusMessage: 'OK',
+      data: Buffer.from('Bearer 4321')
+    })
+  })
+
+  it('should return 200 ok by request', () => {
     let httpClient = new HttpClient()
     let response = httpClient.request('GET', `${httpBaseUrl}/ok`)
     return expect(response, 'to be fulfilled with value satisfying', {

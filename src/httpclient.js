@@ -69,6 +69,7 @@ class HttpClient {
    * @param {number} [options.maxConcurrent=10] Max concurrent connections towards and endpoint(protocol, host and port combination)
    * @param {number} [options.maxTotalConcurrent=100] Max total connections for this HttpClient
    * @param {boolean} [options.autoContentDecoding=true] Automatic content decoding
+   * @param {Object} [options.headers] Headers to include in all requests
    */
   constructor(options = {}) {
     this._timeout = options.timeout || 60 * 1000
@@ -95,6 +96,7 @@ class HttpClient {
       }
     }
     this._endpoints = {}
+    this._headers = options.headers
   }
 
   /**
@@ -423,13 +425,20 @@ class HttpClient {
         this._endpoints[endpointName] = endpoint
       }
 
+      // Build request headers
+      let requestHeaders = Object.assign(
+        {},
+        this._headers,
+        Array.isArray(headers) ? headers.shift() : headers
+      )
+
       let httpOptions = {
         host: pUrl.hostname,
         port: pUrl.port,
         path: pUrl.path,
         method: method,
         auth: pUrl.auth,
-        headers: Array.isArray(headers) ? headers.shift() : headers,
+        headers: requestHeaders,
         agent: endpoint.agent,
         ca: options.ca || this._ca,
         key: options.clientKey || this._clientKey,
