@@ -11,6 +11,7 @@
     "test": "nyc --reporter=lcov --reporter=text mocha \"src/**/*.test.js\"",
     "coveralls": "nyc report --reporter=text-lcov | coveralls"
   },
+  "types": "src/types/@connectedcars/httpclient/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/connectedcars/node-httpclient.git"
