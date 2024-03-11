@@ -49,5 +49,6 @@ declare module '@connectedcars/httpclient' {
     put(url: string, headers?: object, data?: Buffer | string, options?: RequestOptions): Promise<HttpResponse>
     delete(url: string, headers?: object, options?: RequestOptions): Promise<HttpResponse>
     head(url: string, headers?: object, options?: RequestOptions): Promise<HttpResponse>
+    close(): void
   }
 }
